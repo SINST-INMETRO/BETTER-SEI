@@ -15,8 +15,14 @@ Ambiente de referência: SEI 5.0.4 (INMETRO), unidade de teste. Use **somente le
 
 - [ ] **Painel e coluna**: o painel "Pastas" aparece à esquerda; a tabela ganha a coluna "Pasta"; o botão "Pastas" está na barra de comandos.
 - [ ] **Estado inicial**: sem pastas, tudo aparece em "Sem pasta"; o caption mostra o total de registros.
-- [ ] **Nova pasta**: criar "Fiscalização"; o aviso "Entendi" aparece **antes** da primeira gravação; aceitar; a pasta aparece na árvore.
-- [ ] **Subpasta**: criar "Notas Técnicas" dentro de "Fiscalização"; o recuo e a contagem aparecem.
+- [ ] **Chevrons e recolhidas**: as pastas existentes aparecem **recolhidas** (`▸`); clicar na seta expande (`▾`) e mostra subpastas e documentos; clicar de novo recolhe. A seta não troca a seleção.
+- [ ] **Nova pasta filha**: selecionar "Fiscalização" (fundo azul) e clicar em **+ Nova pasta**; a nova pasta nasce **dentro** de "Fiscalização", o pai aparece expandido e a nova fica selecionada.
+- [ ] **Subpasta**: pelo menu **⋯ → Nova subpasta**, criar dentro da pasta; o recuo e a contagem aparecem.
+- [ ] **Documentos na árvore**: expandir uma pasta com documentos; clicar no nome do documento abre o item no SEI em nova aba.
+- [ ] **Diálogos no padrão SEI**: criar/renomear pasta e escolher destino usam diálogo do SEI (sem caixa crua do navegador); Escape e o X cancelam sem gravar.
+- [ ] **Aviso no padrão SEI**: uma barra azul no topo aparece com a mensagem (ex.: ao criar pasta) e fecha sozinha.
+- [ ] **Arrastar documento**: arrastar um documento de "Sem pasta" para uma pasta; aparece a confirmação e, ao aceitar, o documento passa para a pasta.
+- [ ] **Arrastar pasta**: arrastar uma pasta para outra; a confirmação diz explicitamente que a **pasta** (com subpastas e itens) será movida; ao aceitar, a pasta muda de lugar. Soltar uma pasta dentro dela mesma/descendente é recusado com aviso.
 - [ ] **Mover item**: mover um item para "Fiscalização › Notas Técnicas" pelo "Mover para…"; a coluna "Pasta" mostra o caminho e a linha passa a pertencer à pasta.
 - [ ] **Filtro**: clicar na pasta; só as linhas dela ficam visíveis; o caption mostra a contagem da pasta; clicar em "Sem pasta" mostra as demais.
 - [ ] **Busca**: digitar um trecho do título; a árvore e a tabela filtram.

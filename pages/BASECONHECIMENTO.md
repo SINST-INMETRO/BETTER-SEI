@@ -7,11 +7,14 @@ A tela da **Base de Conhecimento** do SEI ganha uma navegação por **pastas hie
 ## Como usar
 
 - O painel **Pastas** aparece à esquerda da lista. Clique numa pasta para ver os itens dela; clique em **Sem pasta** para ver o que ainda não foi organizado.
-- **+ Nova pasta** cria uma pasta. O menu **⋯** de cada pasta tem **Renomear**, **Nova subpasta** e **Excluir**.
+- Cada pasta com conteúdo tem uma **seta** ao lado do nome: `▸` recolhida, `▾` expandida. As pastas começam **recolhidas**; a seta mostra ou esconde as subpastas e os documentos.
+- **+ Nova pasta** cria uma pasta **dentro da pasta selecionada** (com "Sem pasta" ou nada selecionado, cria na raiz). O menu **⋯** de cada pasta tem **Renomear**, **Nova subpasta** e **Excluir**.
 - A lista ganha a coluna **Pasta**, que mostra o caminho de cada item. As linhas de outras pastas ficam ocultas quando você seleciona uma pasta (o filtro é de verdade, não é só esmaecer).
-- Para organizar um item, use **Mover para…** no item (nos itens listados sob a pasta selecionada ou em "Sem pasta"). Para desfazer um vínculo, use **esquecer** nos itens que já não existem no SEI.
+- **Documentos dentro da pasta**: ao expandir uma pasta, os documentos aparecem na árvore; clicar no nome abre o item no SEI (nova aba).
+- Para organizar, **arraste** um documento ou uma pasta para outra pasta (ou para "Sem pasta", que devolve o documento à lista sem pasta; uma pasta solta em "Sem pasta" vai para a raiz). Toda soltura pede **confirmação**; ao mover uma **pasta**, o aviso deixa claro que ela vai com subpastas e itens. Também dá para usar **Mover para…** no documento. Para desfazer um vínculo de item que já não existe no SEI, use **esquecer**.
 - O botão **Pastas**, na barra de comandos, alterna entre a visão em pastas e a lista plana.
 - A busca do painel filtra a árvore e a lista pelo título.
+- Nomear, renomear, confirmar e escolher pasta usam **diálogos no padrão do SEI**; os avisos aparecem numa barra azul no topo, no visual do SEI.
 
 Criar, editar, liberar e excluir **itens** continua sendo feito nas telas do SEI: o SEI Pro só organiza.
 

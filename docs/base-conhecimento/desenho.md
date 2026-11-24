@@ -158,6 +158,15 @@ Regras que o código garante:
 - **Migração**: `formato`/`versao` permitem converter envelopes antigos; versão
   mais nova é preservada e nunca sobrescrita.
 
+## UX das Fases A/B (24/11/2026)
+
+- **Árvore de documentação**: cada pasta com conteúdo tem chevron (`▸`/`▾`) com `aria-expanded`; as pastas começam **recolhidas**. Os documentos aparecem dentro da pasta expandida e o nome é link para a tela nativa (`visualizar`, nova aba).
+- **Nova pasta** cria **filha da pasta selecionada**; o pai é expandido e a nova pasta é selecionada (comportamento de IDE).
+- **Arrastar-e-soltar** de documentos e pastas: alvos são as linhas de pasta e "Sem pasta" (documento → sem pasta; pasta → raiz). Toda soltura pede confirmação e a de pasta diz "Você está movendo a PASTA … (com subpastas e itens)". Pasta em descendente própria é recusada com aviso. O menu "Mover para…" continua como alternativa por teclado.
+- **Diálogos no padrão do SEI** (Shadow DOM): nomear/renomear, confirmar e escolher pasta; `role="dialog"`, `aria-modal`, foco preso, Escape cancela.
+- **Aviso no padrão do SEI**: barra azul `#155f9b` (cabeçalho do SEI; AA com texto branco), `role="status"`/`aria-live`, fecha sozinha e tem botão de fechar.
+- **Sem `window.prompt`/`confirm`** em nenhum fluxo.
+
 ## Privacidade
 
 - O envelope guarda apenas **ids + títulos** e a estrutura de pastas — nenhum
