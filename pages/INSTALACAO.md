@@ -120,7 +120,7 @@ O pacote publicado no GitHub é o da versão **Lab**, que sai primeiro para o gr
 
 Esta seção é para o **teste interno** do módulo **Base de Conhecimento em pastas** (Fases A/B), com o build deste fork (`SINST-INMETRO/BETTER-SEI`). O código já vem compilado na pasta `dist/` do repositório — não é preciso instalar Node nem rodar build.
 
-1. Baixe o repositório neste branch: [feat/base-conhecimento](https://github.com/SINST-INMETRO/BETTER-SEI/tree/feat/base-conhecimento) → **Code → Download ZIP**.
+1. Baixe o repositório: [SINST-INMETRO/BETTER-SEI](https://github.com/SINST-INMETRO/BETTER-SEI) → **Code → Download ZIP** (branch `master`).
 2. **Descompacte** num lugar definitivo (ex.: `Documentos/BETTER-SEI`).
 3. `chrome://extensions` (ou `edge://extensions`) → ligue o **Modo do desenvolvedor** → **Carregar sem compactação** → escolha a pasta **`dist`** (a que contém `manifest.json`).
 4. **Desative o SEI Pro da loja** nesse perfil (duas cópias na mesma página quebram funções).
@@ -137,7 +137,7 @@ Esta seção é para o **teste interno** do módulo **Base de Conhecimento em pa
 
 **Atualizar o build de teste**
 
-1. Baixe o ZIP novo (mesmo branch).
+1. Baixe o ZIP novo (mesmo endereço).
 2. Substitua o conteúdo da pasta `dist` (mantenha a mesma pasta).
 3. Em `chrome://extensions`, clique no **↻** do SEI Pro Lab e recarregue as abas do SEI.
 
