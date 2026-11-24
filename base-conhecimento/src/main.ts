@@ -11,7 +11,6 @@ import { areaChrome } from "@comum/armazenamento/area";
 import { idDispositivo } from "@comum/armazenamento/dispositivo";
 import { lerOpcaoLegada, opcaoLegadaLigada } from "@comum/opcoes/legadas";
 import { travarComLocks, travarEsperando } from "@comum/sincronia/trava";
-import { avisar as avisarPro } from "@comum/ui/aviso";
 import { linkDoMenu } from "@nucleo/links/links";
 import { lerContexto } from "@nucleo/sei";
 import { criarHttp } from "@nucleo/sessao/http";
@@ -19,6 +18,8 @@ import { paginaDe } from "@nucleo/sessao/pagina";
 import { lerItensDaUnidade } from "./nucleo/itens";
 import { armazemDoTexto } from "./pagina/armazem";
 import { montar, quandoDomPronto, telaAtual } from "./pagina/montar";
+import { criarAvisos } from "./ui/aviso";
+import cssAvisos from "./ui/aviso.css";
 import { criarDialogos } from "./ui/dialogos";
 import cssDialogos from "./ui/dialogos.css";
 import cssPainel from "./ui/painel.css";
@@ -58,6 +59,7 @@ async function iniciar(): Promise<void> {
     const area = areaChrome(chrome.storage.local, "local");
     const sync = areaChrome(chrome.storage.sync, "sync");
     const dialogos = criarDialogos({ css: cssDialogos });
+    const avisos = criarAvisos({ css: cssAvisos });
     const sessao = { http: criarHttp(location.href), linkMenu: (acao: string) => linkDoMenu(pagina(), acao) };
     try {
       const desmontar = await montar({
@@ -77,7 +79,7 @@ async function iniciar(): Promise<void> {
         pedirTexto: (rotulo, inicial) => dialogos.pedirTexto(rotulo, inicial),
         confirmar: (texto) => dialogos.confirmar(texto),
         escolherPasta: (pastas, atual) => dialogos.escolherPasta(pastas, atual),
-        avisar: (texto) => avisarPro(texto),
+        avisar: (texto) => avisos.avisar(texto),
         idDispositivo: await idDispositivo(area),
         cssPainel,
         janela: window,
@@ -88,9 +90,11 @@ async function iniciar(): Promise<void> {
       desfazer = () => {
         desmontar();
         dialogos.destruir();
+        avisos.destruir();
       };
     } catch (e) {
       dialogos.destruir();
+      avisos.destruir();
       throw e;
     }
   } finally {
