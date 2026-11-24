@@ -2,7 +2,7 @@
  * Painel de pastas da Base de Conhecimento (Shadow DOM).
  * Tokens aprovados na inspeção de acessibilidade: texto #212529 (15,4:1),
  * secundários #495057 (8,2:1), pasta ativa #155f9b sobre #e7f0f8 (5,8:1).
- * Alvo de clique >= 44 px nos itens da árvore; foco visível em tudo.
+ * Linhas e botões com 44 px de altura; chevron com 28x44 (AA 2.5.8; alvo denso).
  */
 :host {
   display: block;
@@ -45,7 +45,8 @@ button {
   cursor: pointer;
 }
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+a:focus-visible {
   outline: 2px solid #155f9b;
   outline-offset: -2px;
 }
@@ -55,7 +56,7 @@ input:focus-visible {
   gap: 4px;
   color: #155f9b;
   font-weight: 600;
-  min-height: 32px;
+  min-height: 44px;
   padding: 0 6px;
   border-radius: 4px;
 }
@@ -69,7 +70,7 @@ input:focus-visible {
   border-radius: 4px;
   padding: 4px 6px;
   font-size: 12px;
-  min-height: 28px;
+  min-height: 32px;
 }
 ul {
   list-style: none;
@@ -79,8 +80,23 @@ ul {
 .linha {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   border-radius: 4px;
+}
+.chevron {
+  min-width: 28px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 4px;
+  color: #495057;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.chevron:hover {
+  background: #f0f3f8;
+}
+.chevron.vazio {
+  visibility: hidden;
 }
 .pasta {
   display: flex;
@@ -110,10 +126,11 @@ ul {
   margin-left: 16px;
 }
 .menu {
-  min-height: 32px;
-  min-width: 28px;
+  min-height: 44px;
+  min-width: 32px;
   border-radius: 4px;
   color: #495057;
+  flex-shrink: 0;
 }
 .menu:hover {
   background: #e9ecef;
@@ -125,7 +142,7 @@ ul {
   padding: 4px 4px 6px 24px;
 }
 .acoes button {
-  min-height: 32px;
+  min-height: 44px;
   padding: 0 8px;
   border: 1px solid #ced4da;
   border-radius: 4px;
@@ -138,13 +155,19 @@ ul {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
-  padding: 0 4px 0 20px;
+  min-height: 44px;
+  padding: 0 4px;
   color: #212529;
 }
 .item .rotulo {
   flex: 1;
   text-align: left;
+  color: #212529;
+  text-decoration: none;
+}
+a.rotulo:hover,
+a.rotulo:focus-visible {
+  text-decoration: underline;
 }
 .item.orfao .rotulo {
   text-decoration: line-through;
@@ -153,9 +176,10 @@ ul {
 .acao-item {
   color: #155f9b;
   font-size: 11px;
-  min-height: 28px;
+  min-height: 44px;
   padding: 0 6px;
   border-radius: 4px;
+  flex-shrink: 0;
 }
 .acao-item:hover {
   background: #f0f3f8;
@@ -178,19 +202,6 @@ ul {
 }
 .aviso[hidden] {
   display: none;
-}
-.itens-pasta:empty {
-  display: none;
-}
-.itens-pasta {
-  margin: 6px 0;
-  border-top: 1px solid #e9ecef;
-  padding-top: 4px;
-}
-.rotulo-secao {
-  font-size: 11px;
-  color: #495057;
-  padding: 2px 4px 4px 20px;
 }
 .oculto {
   display: none;

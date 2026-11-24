@@ -8,14 +8,18 @@ import { checar, docDe, teste } from "./util";
 
 const CSS = readFileSync(new URL("../src/ui/painel.css", import.meta.url), "utf8");
 
-const item = (agrupador: string, titulo: string): ItemBase => ({
+const item = (
+  agrupador: string,
+  titulo: string,
+  visualizar = "controlador.php?acao=base_conhecimento_visualizar&id_base_conhecimento=42",
+): ItemBase => ({
   agrupador,
   id: agrupador,
   titulo,
   gerador: "usuario.teste",
   dataGeracao: "01/01/2026 10:00:00",
   liberado: true,
-  visualizar: "x",
+  visualizar,
 });
 const pasta = (id: string, nome: string, filhas: PastaExibida[] = [], contagem = 0): PastaExibida => ({
   id,
@@ -46,6 +50,7 @@ function painel() {
   const p = montarPainel(
     {
       aoSelecionar: registrar("aoSelecionar"),
+      aoAlternarPasta: registrar("aoAlternarPasta"),
       aoNovaPasta: registrar("aoNovaPasta"),
       aoRenomear: registrar("aoRenomear"),
       aoExcluir: registrar("aoExcluir"),
@@ -66,6 +71,8 @@ const estado = {
   orfaos: [vinculo("99", "ITEM QUE SUMIU")],
   selecionada: "p2",
   busca: "",
+  itensPorPasta: {},
+  recolhidas: new Set<string>(),
 };
 
 function porTexto(raiz: DocumentFragment, seletor: string, texto: string): HTMLElement | undefined {
@@ -117,8 +124,8 @@ await teste("acoes chamam os callbacks certos", () => {
   );
   disparar(raiz.querySelector('[aria-label="Nova pasta"]') as Element, "click");
   checar(
-    "nova pasta na raiz",
-    chamadas.some((c) => c.acao === "aoNovaPasta" && c.args[0] === null),
+    "nova pasta na raiz (sem selecao no painel)",
+    chamadas.some((c) => c.acao === "aoNovaPasta" && c.args[0] === "p2"),
   );
   disparar(raiz.querySelector('[aria-label="Ações da pasta"]') as Element, "click");
   const excluir = porTexto(raiz, ".acoes button", "Excluir");
@@ -170,15 +177,53 @@ await teste("destruir remove o host e o css tem alvo de 44px e tokens aprovados"
   checar("token de azul SEI", CSS.includes("#155f9b"));
 });
 
-await teste("aviso de indisponivel e itens da pasta selecionada", () => {
-  const { p, chamadas, raiz } = painel();
-  p.render({ ...estado, aviso: "Indisponível nesta unidade.", itensDaSelecionada: [item("41", "ITEM DA PASTA")] });
+await teste("aviso de indisponivel aparece como status", () => {
+  const { p, raiz } = painel();
+  p.render({ ...estado, aviso: "Indisponível nesta unidade." });
   checar("aviso", raiz.querySelector('.aviso[role="status"]')?.textContent === "Indisponível nesta unidade.");
-  const mover = [...raiz.querySelectorAll(".itens-pasta button")].find((b) => b.textContent === "Mover para…") as HTMLElement;
-  checar("item da pasta", mover !== undefined);
+});
+
+await teste("pasta recolhida esconde filhos e o chevron alterna sem selecionar", () => {
+  const { p, chamadas, raiz } = painel();
+  p.render({ ...estado, recolhidas: new Set(["p1"]) });
+  checar("sem filhos visiveis", raiz.querySelector(".filhas .pasta") === null);
+  const chevron = raiz.querySelector('[aria-label="Expandir pasta Fiscalizacao"]');
+  checar("chevron existe", chevron !== null);
+  checar("aria-expanded false", chevron?.getAttribute("aria-expanded") === "false");
+  if (chevron) disparar(chevron, "click");
+  checar(
+    "alterna sem selecionar",
+    chamadas.some((c) => c.acao === "aoAlternarPasta" && c.args[0] === "p1"),
+  );
+  checar("nao selecionou", !chamadas.some((c) => c.acao === "aoSelecionar"));
+});
+
+await teste("pasta expandida mostra aria-expanded true e rotulo de recolher", () => {
+  const { p, raiz } = painel();
+  p.render({ ...estado, recolhidas: new Set() });
+  const chevron = raiz.querySelector(`[aria-label="Recolher pasta Fiscalizacao"]`);
+  checar("filhos visiveis", raiz.querySelector(".filhas .pasta") !== null);
+  checar("aria-expanded true", chevron?.getAttribute("aria-expanded") === "true");
+});
+
+await teste("documentos dentro da pasta aparecem com link para o SEI", () => {
+  const { p, chamadas, raiz } = painel();
+  p.render({
+    ...estado,
+    selecionada: "p3",
+    itensPorPasta: { p3: [item("50", "DOC DA PASTA")] },
+  });
+  const link = [...raiz.querySelectorAll(".filhas.itens .item a.rotulo")].find(
+    (a) => a.textContent === "DOC DA PASTA",
+  ) as HTMLAnchorElement;
+  checar("link do documento", link !== undefined);
+  checar("href do visualizar", (link?.getAttribute("href") ?? "").includes("base_conhecimento_visualizar"));
+  checar("nova aba", link?.getAttribute("target") === "_blank");
+  const mover = [...raiz.querySelectorAll(".filhas.itens .item button")].find((b) => b.textContent === "Mover para…") as HTMLElement;
+  checar("mover no documento da pasta", mover !== undefined);
   if (mover) disparar(mover, "click");
   checar(
-    "move item da pasta",
-    chamadas.some((c) => c.acao === "aoMoverItem" && c.args[0] === "41"),
+    "move documento da pasta",
+    chamadas.some((c) => c.acao === "aoMoverItem" && c.args[0] === "50"),
   );
 });

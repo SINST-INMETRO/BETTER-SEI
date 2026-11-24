@@ -217,8 +217,29 @@ await teste("mover item para a pasta e lista-lo na pasta selecionada", async () 
   await esperar();
   checar(
     "item listado dentro da pasta",
-    [...s.querySelectorAll(".itens-pasta .item .rotulo")].some((r) => r.textContent === "PROCEDIMENTO DE EXEMPLO A"),
+    [...s.querySelectorAll(".filhas.itens .item .rotulo")].some((r) => r.textContent === "PROCEDIMENTO DE EXEMPLO A"),
   );
   checar("caption com 1 registro", (d.doc.querySelector("caption.infraCaption")?.textContent ?? "").endsWith("(1 registro):"));
+  desfazer();
+});
+
+await teste("pastas existentes comecam recolhidas", async () => {
+  const d = deps();
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": { id: "p1", nome: "Fiscalizacao", pai: null, ordem: "a0", atualizadoEm: 1, dispositivo: "d1" },
+    "base-conhecimento/vinculos/40": {
+      id: "40",
+      titulo: "PROCEDIMENTO DE EXEMPLO A",
+      pasta: "p1",
+      ordem: "a0",
+      atualizadoEm: 2,
+      dispositivo: "d1",
+    },
+  });
+  const desfazer = await montar(d);
+  const s = sombra(d.doc);
+  const chevron = s.querySelector('[aria-label="Expandir pasta Fiscalizacao"]');
+  checar("chegou recolhida", chevron?.getAttribute("aria-expanded") === "false");
+  checar("item nao aparece na arvore recolhida", s.querySelector(".filhas.itens") === null);
   desfazer();
 });

@@ -113,6 +113,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   let ent: EntidadesArvore = await repo.listar();
   let exibicao: Exibicao = montarExibicao(ent, itens);
   let selecionada: string | null = exibicao.pastas[0]?.id ?? null;
+  const recolhidas = new Set<string>(idsDasPastas(exibicao.pastas));
   let busca = "";
   let modo: Modo = "arvore";
   let status: StatusSync | null = null;
@@ -139,6 +140,11 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   const acoes: AcoesPainel = {
     aoSelecionar: (id) => {
       selecionada = id;
+      render();
+    },
+    aoAlternarPasta: (id) => {
+      if (recolhidas.has(id)) recolhidas.delete(id);
+      else recolhidas.add(id);
       render();
     },
     aoNovaPasta: (pai) => void novaPasta(pai),
@@ -225,7 +231,9 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     if (nome === null) return;
     if (!(await garantirEscrita())) return;
     try {
-      await repo.criarPasta(nome, pai);
+      const nova = await repo.criarPasta(nome, pai);
+      if (pai !== null) recolhidas.delete(pai);
+      selecionada = nova.id;
       await refrescar();
     } catch (e) {
       d.avisar(e instanceof Error ? e.message : String(e));
@@ -299,10 +307,30 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     return new Set(ent.v.filter((v) => v.removidoEm === undefined && v.pasta === id).map((v) => v.id));
   }
 
-  function itensDaSelecionada(): ItemBase[] {
-    if (selecionada === null) return [];
-    const chaves = agrupadoresDaPasta(selecionada);
-    return itens.filter((i) => chaves.has(i.agrupador));
+  function itensPorPasta(): Record<string, ItemBase[]> {
+    const porAgrupador = new Map(itens.map((i) => [i.agrupador, i]));
+    const mapa: Record<string, ItemBase[]> = {};
+    for (const v of ent.v) {
+      if (v.removidoEm !== undefined || v.pasta === null) continue;
+      const item = porAgrupador.get(v.id);
+      if (!item) continue;
+      const lista = mapa[v.pasta];
+      if (lista) lista.push(item);
+      else mapa[v.pasta] = [item];
+    }
+    return mapa;
+  }
+
+  function idsDasPastas(pastas: PastaExibida[]): string[] {
+    const ids: string[] = [];
+    const andar = (lista: PastaExibida[]): void => {
+      for (const p of lista) {
+        ids.push(p.id);
+        andar(p.filhas);
+      }
+    };
+    andar(pastas);
+    return ids;
   }
 
   function rotuloDe(agrupador: string): string {
@@ -334,7 +362,8 @@ export async function montar(d: DepsMontar): Promise<() => void> {
       selecionada,
       busca,
       aviso: somenteLeitura() ? (status?.mensagem ?? AVISO_SO_LEITURA) : undefined,
-      itensDaSelecionada: itensDaSelecionada(),
+      itensPorPasta: itensPorPasta(),
+      recolhidas,
     });
     aplicarFiltro();
   }
