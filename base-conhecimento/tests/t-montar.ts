@@ -4,6 +4,7 @@ import { disparar } from "../../sei-comum/tests/util";
 import { itensDaPagina } from "../src/nucleo/itens";
 import { consentimentoBase } from "../src/pagina/consentir";
 import { type DepsMontar, montar, quandoDomPronto, telaAtual } from "../src/pagina/montar";
+import { MIME_ARRASTO, type PayloadArrasto, serializarArrasto } from "../src/ui/arrasto";
 import { checar, docFixture, paginaFixture, teste } from "./util";
 
 const IDENT = { host: "sei.exemplo.gov.br", unidade: "110000108" };
@@ -241,5 +242,154 @@ await teste("pastas existentes comecam recolhidas", async () => {
   const chevron = s.querySelector('[aria-label="Expandir pasta Fiscalizacao"]');
   checar("chegou recolhida", chevron?.getAttribute("aria-expanded") === "false");
   checar("item nao aparece na arvore recolhida", s.querySelector(".filhas.itens") === null);
+  desfazer();
+});
+
+function eventoCom(el: Element, tipo: string, extra: Record<string, unknown>): Event {
+  const Ev = (el.ownerDocument.defaultView as unknown as { Event: typeof Event }).Event;
+  const ev = new Ev(tipo, { bubbles: true, cancelable: true });
+  Object.assign(ev, extra);
+  return ev;
+}
+
+function dtFake(mime = MIME_ARRASTO, valor = ""): DataTransfer {
+  const dados: Record<string, string> = {};
+  if (mime) dados[mime] = valor;
+  return {
+    setData: (t: string, v: string) => {
+      dados[t] = v;
+    },
+    getData: (t: string) => dados[t] ?? "",
+  } as unknown as DataTransfer;
+}
+
+function soltar(el: Element, payload: PayloadArrasto): void {
+  el.dispatchEvent(eventoCom(el, "drop", { dataTransfer: dtFake(MIME_ARRASTO, serializarArrasto(payload)) }));
+}
+
+function linhaDaPasta(doc: Document, nome: string): HTMLElement | undefined {
+  const s = sombra(doc);
+  const b = [...s.querySelectorAll(".pasta")].find((x) => x.textContent?.startsWith(nome)) as HTMLElement | undefined;
+  return b?.parentElement as HTMLElement | undefined;
+}
+
+async function chavesDaArea(area: import("@comum/armazenamento/area").Area): Promise<string[]> {
+  return (await area.chaves?.()) ?? Object.keys(await area.obter(null));
+}
+
+await teste("soltar item confirma com titulo e caminho e move", async () => {
+  const textos: string[] = [];
+  const d = deps({
+    confirmar: async (t) => {
+      textos.push(t);
+      return true;
+    },
+  });
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": { id: "p1", nome: "Fiscalizacao", pai: null, ordem: "a0", atualizadoEm: 1, dispositivo: "d1" },
+  });
+  const desfazer = await montar(d);
+  const linha = linhaDaPasta(d.doc, "Fiscalizacao");
+  checar("linha existe", linha !== undefined);
+  if (linha) soltar(linha, { tipo: "item", agrupador: "40" });
+  await esperar();
+  checar(
+    "confirmou com titulo e caminho",
+    textos.some((t) => t.includes("PROCEDIMENTO DE EXEMPLO A") && t.includes("Fiscalizacao")),
+  );
+  const vinculo = (await d.area.obter("base-conhecimento/vinculos/40"))["base-conhecimento/vinculos/40"] as
+    | { pasta: string | null }
+    | undefined;
+  checar("vinculo movido", vinculo?.pasta === "p1");
+  desfazer();
+});
+
+await teste("soltar pasta enfatiza que e pasta e move com confirmacao", async () => {
+  const textos: string[] = [];
+  const d = deps({
+    confirmar: async (t) => {
+      textos.push(t);
+      return true;
+    },
+  });
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": { id: "p1", nome: "Pai", pai: null, ordem: "a0", atualizadoEm: 1, dispositivo: "d1" },
+    "base-conhecimento/pastas/p2": { id: "p2", nome: "Filha", pai: null, ordem: "a1", atualizadoEm: 2, dispositivo: "d1" },
+  });
+  const desfazer = await montar(d);
+  const linhaPai = linhaDaPasta(d.doc, "Pai");
+  checar("linha pai", linhaPai !== undefined);
+  if (linhaPai) soltar(linhaPai, { tipo: "pasta", id: "p2" });
+  await esperar();
+  checar(
+    "texto enfatiza pasta",
+    textos.some((t) => t.includes("PASTA") && t.includes("Filha")),
+  );
+  const p2 = (await d.area.obter("base-conhecimento/pastas/p2"))["base-conhecimento/pastas/p2"] as { pai: string | null } | undefined;
+  checar("pai aplicado", p2?.pai === "p1");
+  desfazer();
+});
+
+await teste("cancelar a confirmacao nao move", async () => {
+  const d = deps({ confirmar: async () => false });
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": { id: "p1", nome: "Fiscalizacao", pai: null, ordem: "a0", atualizadoEm: 1, dispositivo: "d1" },
+  });
+  const desfazer = await montar(d);
+  const linha = linhaDaPasta(d.doc, "Fiscalizacao");
+  if (linha) soltar(linha, { tipo: "item", agrupador: "40" });
+  await esperar();
+  checar("sem vinculo", (await d.area.obter("base-conhecimento/vinculos/40"))["base-conhecimento/vinculos/40"] === undefined);
+  desfazer();
+});
+
+await teste("pasta em descendente e recusada com aviso", async () => {
+  const avisos: string[] = [];
+  let confirmou = 0;
+  const d = deps({
+    avisar: (t) => avisos.push(t),
+    confirmar: async () => {
+      confirmou++;
+      return true;
+    },
+  });
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": { id: "p1", nome: "Pai", pai: null, ordem: "a0", atualizadoEm: 1, dispositivo: "d1" },
+    "base-conhecimento/pastas/p2": { id: "p2", nome: "Filha", pai: "p1", ordem: "a0", atualizadoEm: 2, dispositivo: "d1" },
+  });
+  const desfazer = await montar(d);
+  const s = sombra(d.doc);
+  const chevron = s.querySelector('[aria-label="Expandir pasta Pai"]') as Element | null;
+  checar("pai recolhido", chevron !== null);
+  if (chevron) disparar(chevron, "click");
+  await esperar();
+  const linhaFilha = linhaDaPasta(d.doc, "Filha");
+  checar("filha visivel", linhaFilha !== undefined);
+  if (linhaFilha) soltar(linhaFilha, { tipo: "pasta", id: "p1" });
+  await esperar();
+  checar("avisou", avisos.length >= 1);
+  checar("nao confirmou", confirmou === 0);
+  const p1 = (await d.area.obter("base-conhecimento/pastas/p1"))["base-conhecimento/pastas/p1"] as { pai: string | null } | undefined;
+  checar("pai intacto", p1?.pai === null);
+  desfazer();
+});
+
+await teste("nova pasta nasce filha da selecionada e expande o pai", async () => {
+  const d = deps({ pedirTexto: async () => "Filha" });
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": { id: "p1", nome: "Pai", pai: null, ordem: "a0", atualizadoEm: 1, dispositivo: "d1" },
+  });
+  const desfazer = await montar(d);
+  const s = sombra(d.doc);
+  const botao = [...s.querySelectorAll(".pasta")].find((b) => b.textContent?.startsWith("Pai")) as Element;
+  disparar(botao, "click");
+  await esperar();
+  disparar(s.querySelector('[aria-label="Nova pasta"]') as Element, "click");
+  await esperar();
+  const chave = (await chavesDaArea(d.area)).find((k) => k.startsWith("base-conhecimento/pastas/") && k !== "base-conhecimento/pastas/p1");
+  checar("nova pasta criada", chave !== undefined);
+  const nova = (await d.area.obter(chave ?? ""))[chave ?? ""] as { pai: string | null; nome: string } | undefined;
+  checar("filha de p1", nova?.pai === "p1" && nova?.nome === "Filha");
+  checar("pai expandido", s.querySelector('[aria-label="Recolher pasta Pai"]') !== null);
   desfazer();
 });

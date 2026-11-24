@@ -11,6 +11,7 @@ import { icone } from "@comum/ui/dom";
 import type { PastaExibida } from "../arvore/mesclar";
 import type { Vinculo } from "../arvore/modelo";
 import type { ItemBase } from "../nucleo/tipos";
+import { lerArrasto, MIME_ARRASTO, type PayloadArrasto, serializarArrasto } from "./arrasto";
 
 export interface EstadoPainel {
   pastas: PastaExibida[];
@@ -35,6 +36,8 @@ export interface AcoesPainel {
   aoMoverItem(agrupador: string): void;
   aoRemoverItem(agrupador: string): void;
   aoBuscar(texto: string): void;
+  /** Soltou um documento ou uma pasta sobre um destino (pasta id, ou null = Sem pasta/raiz). */
+  aoSoltar(payload: PayloadArrasto, destino: string | null): void;
 }
 
 export interface OpcoesPainel {
@@ -111,6 +114,34 @@ export function montarPainel(
     return e;
   };
 
+  function tornarArrastavel(el: HTMLElement, payload: PayloadArrasto): void {
+    el.setAttribute("draggable", "true");
+    el.addEventListener("dragstart", (ev) => {
+      const e = ev as DragEvent;
+      e.stopPropagation();
+      if (e.dataTransfer) {
+        e.dataTransfer.setData(MIME_ARRASTO, serializarArrasto(payload));
+        e.dataTransfer.effectAllowed = "move";
+      }
+    });
+  }
+
+  function tornarAlvo(el: HTMLElement, destino: string | null): void {
+    el.addEventListener("dragover", (ev) => {
+      ev.preventDefault();
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = "move";
+      el.classList.add("alvo");
+    });
+    el.addEventListener("dragenter", () => el.classList.add("alvo"));
+    el.addEventListener("dragleave", () => el.classList.remove("alvo"));
+    el.addEventListener("drop", (ev) => {
+      ev.preventDefault();
+      el.classList.remove("alvo");
+      const payload = lerArrasto(ev.dataTransfer);
+      if (payload) acoes.aoSoltar(payload, destino);
+    });
+  }
+
   const combina = (texto: string): boolean => {
     const b = atual.busca.trim().toLowerCase();
     return b === "" || texto.toLowerCase().includes(b);
@@ -147,6 +178,7 @@ export function montarPainel(
     acao.textContent = rotuloAcao;
     acao.addEventListener("click", agir);
     acao.dataset.agrupador = agrupador;
+    if (!orfao) tornarArrastavel(div, { tipo: "item", agrupador });
     div.append(ic, rotulo, acao);
     li.append(div);
     return li;
@@ -184,6 +216,8 @@ export function montarPainel(
     cont.textContent = String(p.contagem);
     botao.append(ic, nome, cont);
     botao.addEventListener("click", () => acoes.aoSelecionar(p.id));
+    tornarArrastavel(botao, { tipo: "pasta", id: p.id });
+    tornarAlvo(linha, p.id);
 
     const menu = el("button", "menu");
     menu.setAttribute("type", "button");
@@ -248,6 +282,7 @@ export function montarPainel(
     contSem.textContent = String(estado.semPasta.length);
     botaoSem.append(icSem, nomeSem, contSem);
     botaoSem.addEventListener("click", () => acoes.aoSelecionar(null));
+    tornarAlvo(linhaSem, null);
     linhaSem.append(vazio, botaoSem);
     liSem.append(linhaSem);
 

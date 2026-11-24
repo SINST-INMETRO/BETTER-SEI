@@ -20,6 +20,7 @@ import { RepositorioArvore } from "../arvore/repositorio";
 import { agrupadorDoTr } from "../nucleo/itens";
 import type { ItemBase } from "../nucleo/tipos";
 import { chaveStatus } from "../sincronia/envelope";
+import type { PayloadArrasto } from "../ui/arrasto";
 import { garantirBotaoPastas, ID_BOTAO, type Modo } from "../ui/botao";
 import {
   atualizarCaption,
@@ -156,6 +157,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
       busca = texto;
       render();
     },
+    aoSoltar: (payload, destino) => void soltar(payload, destino),
   };
 
   const painel = montarPainel(acoes, { doc, css: d.cssPainel });
@@ -284,6 +286,57 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     if (!(await garantirEscrita())) return;
     try {
       await repo.removerVinculo(agrupador);
+      await refrescar();
+    } catch (e) {
+      d.avisar(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  function subarvoreContem(lista: PastaExibida[], raizId: string, alvoId: string): boolean {
+    const achar = (l: PastaExibida[]): PastaExibida | undefined => {
+      for (const p of l) {
+        if (p.id === raizId) return p;
+        const f = achar(p.filhas);
+        if (f) return f;
+      }
+      return undefined;
+    };
+    const raiz = achar(lista);
+    if (!raiz) return false;
+    const andar = (l: PastaExibida[]): boolean => l.some((p) => p.id === alvoId || andar(p.filhas));
+    return raiz.id === alvoId || andar(raiz.filhas);
+  }
+
+  async function soltar(payload: PayloadArrasto, destino: string | null): Promise<void> {
+    if (payload.tipo === "pasta") {
+      if (destino === payload.id) return;
+      if (destino !== null && subarvoreContem(exibicao.pastas, payload.id, destino)) {
+        d.avisar("Uma pasta não pode ir para dentro dela mesma.");
+        return;
+      }
+      const nome = nomesDasPastas().get(payload.id) ?? "pasta";
+      const caminho = destino === null ? "a raiz" : caminhoDaPasta(exibicao.pastas, destino) || "a raiz";
+      if (!(await d.confirmar(`Você está movendo a PASTA "${nome}" (com subpastas e itens) para "${caminho}". Confirmar?`))) return;
+      if (!(await garantirEscrita())) return;
+      try {
+        await repo.moverPasta(payload.id, destino);
+        if (destino !== null) recolhidas.delete(destino);
+        await refrescar();
+      } catch (e) {
+        d.avisar(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
+
+    const vinculo = ent.v.find((v) => v.id === payload.agrupador && v.removidoEm === undefined);
+    const item = itens.find((i) => i.agrupador === payload.agrupador);
+    const titulo = item?.titulo ?? vinculo?.titulo ?? "";
+    const caminho = destino === null ? "Sem pasta" : caminhoDaPasta(exibicao.pastas, destino) || "Sem pasta";
+    if (!(await d.confirmar(`Mover "${titulo}" para "${caminho}"?`))) return;
+    if (!(await garantirEscrita())) return;
+    try {
+      await repo.moverVinculo(payload.agrupador, destino, titulo);
+      if (destino !== null) recolhidas.delete(destino);
       await refrescar();
     } catch (e) {
       d.avisar(e instanceof Error ? e.message : String(e));

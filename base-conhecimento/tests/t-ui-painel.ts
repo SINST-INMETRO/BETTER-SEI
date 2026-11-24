@@ -3,6 +3,7 @@ import { disparar } from "../../sei-comum/tests/util";
 import type { PastaExibida } from "../src/arvore/mesclar";
 import type { Vinculo } from "../src/arvore/modelo";
 import type { ItemBase } from "../src/nucleo/tipos";
+import { lerArrasto, MIME_ARRASTO, serializarArrasto } from "../src/ui/arrasto";
 import { montarPainel } from "../src/ui/painel";
 import { checar, docDe, teste } from "./util";
 
@@ -57,6 +58,7 @@ function painel() {
       aoMoverItem: registrar("aoMoverItem"),
       aoRemoverItem: registrar("aoRemoverItem"),
       aoBuscar: registrar("aoBuscar"),
+      aoSoltar: registrar("aoSoltar"),
     },
     { doc, css: CSS },
   );
@@ -225,5 +227,66 @@ await teste("documentos dentro da pasta aparecem com link para o SEI", () => {
   checar(
     "move documento da pasta",
     chamadas.some((c) => c.acao === "aoMoverItem" && c.args[0] === "50"),
+  );
+});
+
+function eventoCom(el: Element, tipo: string, extra: Record<string, unknown>): Event {
+  const Ev = (el.ownerDocument.defaultView as unknown as { Event: typeof Event }).Event;
+  const ev = new Ev(tipo, { bubbles: true, cancelable: true });
+  Object.assign(ev, extra);
+  return ev;
+}
+
+function dtFake(mime = MIME_ARRASTO, valor = ""): DataTransfer {
+  const dados: Record<string, string> = {};
+  if (mime) dados[mime] = valor;
+  return {
+    setData: (t: string, v: string) => {
+      dados[t] = v;
+    },
+    getData: (t: string) => dados[t] ?? "",
+  } as unknown as DataTransfer;
+}
+
+await teste("pastas e documentos sao arrastaveis e pastas aceitam soltar", () => {
+  const { p, chamadas, raiz } = painel();
+  p.render({ ...estado, itensPorPasta: { p1: [item("41", "DOC")] }, recolhidas: new Set() });
+
+  const fiscal = [...raiz.querySelectorAll(".pasta")].find((b) => b.textContent?.startsWith("Fiscalizacao")) as HTMLElement;
+  checar("pasta arrastavel", fiscal.getAttribute("draggable") === "true");
+  const dt = dtFake();
+  fiscal.dispatchEvent(eventoCom(fiscal, "dragstart", { dataTransfer: dt }));
+  checar("payload da pasta", lerArrasto(dt)?.tipo === "pasta");
+
+  const itemEl = raiz.querySelector(".filhas.itens .item") as HTMLElement;
+  checar("documento arrastavel", itemEl.getAttribute("draggable") === "true");
+  const dtItem = dtFake();
+  itemEl.dispatchEvent(eventoCom(itemEl, "dragstart", { dataTransfer: dtItem }));
+  checar("payload do documento", lerArrasto(dtItem)?.tipo === "item");
+
+  const talentos = [...raiz.querySelectorAll(".pasta")].find((b) => b.textContent?.startsWith("Talentos")) as HTMLElement;
+  const linha = talentos.parentElement as HTMLElement;
+  const over = eventoCom(linha, "dragover", { dataTransfer: dtFake() });
+  linha.dispatchEvent(over);
+  checar("dragover impede o padrao e marca alvo", over.defaultPrevented && linha.classList.contains("alvo"));
+
+  const drop = eventoCom(linha, "drop", { dataTransfer: dtFake(MIME_ARRASTO, serializarArrasto({ tipo: "item", agrupador: "40" })) });
+  linha.dispatchEvent(drop);
+  checar(
+    "soltou item na pasta",
+    chamadas.some((c) => c.acao === "aoSoltar" && c.args[1] === "p3"),
+  );
+  checar("destaque removido", !linha.classList.contains("alvo"));
+});
+
+await teste("Sem pasta aceita soltar pasta", () => {
+  const { p, chamadas, raiz } = painel();
+  p.render(estado);
+  const sem = raiz.querySelector(".sem-pasta") as HTMLElement;
+  const linha = sem.parentElement as HTMLElement;
+  linha.dispatchEvent(eventoCom(linha, "drop", { dataTransfer: dtFake(MIME_ARRASTO, serializarArrasto({ tipo: "pasta", id: "p1" })) }));
+  checar(
+    "destino nulo",
+    chamadas.some((c) => c.acao === "aoSoltar" && c.args[1] === null),
   );
 });
