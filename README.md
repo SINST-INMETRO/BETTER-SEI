@@ -22,6 +22,8 @@ Instale a extensão para seu navegador preferido:
 
 Loja de extensões bloqueada no computador de trabalho? Veja [como instalar pelo pacote publicado no GitHub](./pages/INSTALACAO.md), sem passar pela loja.
 
+Para testar a **Base de Conhecimento em pastas** (build Lab deste repositório), siga a seção [Testar a Base de Conhecimento em pastas](./pages/INSTALACAO.md#testar-a-base-de-conhecimento-em-pastas-build-deste-repositório).
+
 ## Funcionalidades disponíveis
 
 ### Tela Controle de Processos

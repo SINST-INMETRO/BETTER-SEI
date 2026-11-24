@@ -115,3 +115,32 @@ Em `chrome://extensions` ou `edge://extensions`, clique em **Remover** no cartã
 ### Por que o nome é "SEI Pro Lab"
 
 O pacote publicado no GitHub é o da versão **Lab**, que sai primeiro para o grupo de testadores. As funções são as mesmas da versão da loja; mudam o nome, o ícone e a lista dos órgãos que têm uma versão própria do SEI Pro. O nome diferente ajuda a distinguir uma da outra quando as duas aparecem na mesma lista — situação que, de todo modo, convém evitar.
+
+## Testar a Base de Conhecimento em pastas (build deste repositório)
+
+Esta seção é para o **teste interno** do módulo **Base de Conhecimento em pastas** (Fases A/B), com o build deste fork (`SINST-INMETRO/BETTER-SEI`). O código já vem compilado na pasta `dist/` do repositório — não é preciso instalar Node nem rodar build.
+
+1. Baixe o repositório neste branch: [feat/base-conhecimento](https://github.com/SINST-INMETRO/BETTER-SEI/tree/feat/base-conhecimento) → **Code → Download ZIP**.
+2. **Descompacte** num lugar definitivo (ex.: `Documentos/BETTER-SEI`).
+3. `chrome://extensions` (ou `edge://extensions`) → ligue o **Modo do desenvolvedor** → **Carregar sem compactação** → escolha a pasta **`dist`** (a que contém `manifest.json`).
+4. **Desative o SEI Pro da loja** nesse perfil (duas cópias na mesma página quebram funções).
+5. Abra o SEI na **mesma unidade do teste** → **Base de Conhecimento → lista da unidade** → recarregue (F5).
+6. Na primeira vez que criar uma pasta, aceite o aviso **"Entendi"**.
+
+**Pré-requisitos e limites**
+
+- Chrome ou Edge. No Firefox, este branch ainda não tem o pacote MV2.
+- O build é o **SEI Pro Lab inteiro** (todas as funções), não só a Base de Conhecimento.
+- Todos precisam estar na mesma unidade do SEI, e o perfil precisa poder **alterar Textos Padrão** na unidade (senão a árvore fica em modo leitura).
+- A organização fica no Texto Padrão `[_SEIPRO_BC_UNIDADE]` da unidade (visível a quem tem acesso a ele). Os itens da Base de Conhecimento **não** são criados, alterados ou excluídos.
+- Roteiro de teste e conferência de segurança: [roteiro-teste.md](../docs/base-conhecimento/roteiro-teste.md).
+
+**Atualizar o build de teste**
+
+1. Baixe o ZIP novo (mesmo branch).
+2. Substitua o conteúdo da pasta `dist` (mantenha a mesma pasta).
+3. Em `chrome://extensions`, clique no **↻** do SEI Pro Lab e recarregue as abas do SEI.
+
+**Se algo não aparecer**
+
+Abra o console (F12) na aba do SEI e procure `[SEI Pro] base-conhecimento`; e confira em `chrome://extensions` o cartão do **SEI Pro Lab** (botão **Erros**). Reporte o que apareceu junto com a versão do build.
