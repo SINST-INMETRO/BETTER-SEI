@@ -1,5 +1,5 @@
 import type { PastaExibida } from "../src/arvore/mesclar";
-import { criarDialogos } from "../src/ui/dialogos";
+import { criarDialogos, elementoAtivoProfundo, pastaDoSelect, proximoFoco } from "../src/ui/dialogos";
 import { checar, docDe, teste } from "./util";
 
 const CSS = ".overlay{position:fixed}";
@@ -114,4 +114,30 @@ await teste("destruir remove o host", () => {
   const { doc, d } = montar();
   d.destruir();
   checar("host removido", doc.querySelector(".spro-bc-dialogos") === null);
+});
+
+await teste("pastaDoSelect le o valor vivo, nao o atributo", () => {
+  checar("pasta", JSON.stringify(pastaDoSelect({ value: "p1" } as HTMLSelectElement)) === JSON.stringify({ pasta: "p1" }));
+  checar("sem pasta", JSON.stringify(pastaDoSelect({ value: "" } as HTMLSelectElement)) === JSON.stringify({ pasta: null }));
+});
+
+await teste("elementoAtivoProfundo desce pelos shadow roots", () => {
+  const botao = { id: "botao" } as unknown as HTMLElement;
+  const hostInterno = { shadowRoot: { activeElement: botao } } as unknown as HTMLElement;
+  const hostExterno = { shadowRoot: { activeElement: hostInterno } } as unknown as HTMLElement;
+  checar("um nivel", elementoAtivoProfundo({ activeElement: hostInterno } as unknown as Document) === botao);
+  checar("dois niveis", elementoAtivoProfundo({ activeElement: hostExterno } as unknown as Document) === botao);
+  checar("sem shadow", elementoAtivoProfundo({ activeElement: botao } as unknown as Document) === botao);
+});
+
+await teste("proximoFoco cicla o Tab no modal", () => {
+  const a = { id: "a" } as HTMLElement;
+  const b = { id: "b" } as HTMLElement;
+  const c = { id: "c" } as HTMLElement;
+  checar("ultimo -> primeiro", proximoFoco([a, b, c], c, false) === a);
+  checar("primeiro -> ultimo (shift)", proximoFoco([a, b, c], a, true) === c);
+  checar("meio deixa seguir", proximoFoco([a, b, c], b, false) === null);
+  checar("sem atual vai ao primeiro", proximoFoco([a, b, c], null, false) === a);
+  checar("sem atual shift vai ao ultimo", proximoFoco([a, b, c], null, true) === c);
+  checar("vazio", proximoFoco([], null, false) === null);
 });

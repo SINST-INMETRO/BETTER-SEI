@@ -4,9 +4,9 @@
 
 ## Resumo
 
-**Achados:** 0 críticos · 0 maiores · 1 menor (alvo denso do chevron vs. AAA).
+**Achados (após as correções da revisão final):** 0 críticos · 0 maiores · menores deferidos (ver ledger). A medição **ao vivo** no navegador continua pendente de recarregar a extensão; o que está abaixo foi fixado em CSS/testes e nos helpers pós-revisão.
 
-Os contrastes foram calculados a partir dos tokens fixos do CSS (não dependem do render) e os comportamentos de teclado/ARIA são cobertos pelos testes automatizados (`npm run verificar`, 96 verificações). A repetição da medição no navegador após recarregar a extensão está descrita no fim.
+Os contrastes foram calculados a partir dos tokens fixos do CSS (não dependem do render) e os comportamentos de teclado/ARIA são cobertos pelos testes automatizados (`npm run verificar`, 101 verificações). A repetição da medição no navegador após recarregar a extensão está descrita no fim.
 
 ## Percebível (contraste — 1.4.3 / 1.4.11)
 
@@ -27,8 +27,15 @@ Os contrastes foram calculados a partir dos tokens fixos do CSS (não dependem d
 
 - **Chevrons** são `<button>` com `aria-expanded` e `aria-label` ("Expandir/Recolher pasta X"); teclado Enter/Espaço nativos.
 - **Diálogos**: foco inicial no campo, `Tab` preso no modal, `Escape` cancela e devolve `null`/`false`, foco volta ao elemento de origem.
-- **Arrastar-e-soltar** tem alternativa por teclado: o menu **Mover para…** (botão em cada documento) e **Nova subpasta**.
+- **Arrastar-e-soltar** tem alternativa por teclado: o menu do documento **Mover para…** e o menu da pasta **⋯ → Mover para…** (com a mesma confirmação de pasta).
 - **Alvos**: linhas e botões com 44 px; o chevron tem **28×44** (atende 2.5.8/AA, 24×24). Para 2.5.5/AAA (44×44) o alvo é dispensado por ser controle denso ao lado do nome — registrado como menor.
+
+## Correções da revisão final (24/11/2026)
+
+- **Seleção viva do `<select>`**: o diálogo lê `select.value` (helper `pastaDoSelect`), não o atributo `selected` (que é só o valor de partida). Teste cobre valor e "Sem pasta".
+- **Foco no Shadow DOM**: `elementoAtivoProfundo` desce pelos shadow roots (o `document.activeElement` é retargetado) e `proximoFoco` cicla o Tab; Escape cancela e o foco volta à origem. Testes unitários dos dois helpers.
+- **Alternativa por teclado para pastas**: menu **⋯ → Mover para…**, com a confirmação "Você está movendo a PASTA … (com subpastas e itens)".
+- **Foco após re-render**: chevrons e nomes de pasta têm `data-pasta-id`; o montar refoca o equivalente depois de alternar/selecionar (a árvore é reconstruída).
 
 ## Compreensível (3.3.1 / 3.3.2)
 

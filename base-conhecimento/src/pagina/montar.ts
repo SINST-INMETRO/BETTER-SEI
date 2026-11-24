@@ -142,11 +142,13 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     aoSelecionar: (id) => {
       selecionada = id;
       render();
+      focarPasta(id, "selecionar");
     },
     aoAlternarPasta: (id) => {
       if (recolhidas.has(id)) recolhidas.delete(id);
       else recolhidas.add(id);
       render();
+      focarPasta(id, "chevron");
     },
     aoNovaPasta: (pai) => void novaPasta(pai),
     aoRenomear: (id) => void renomear(id),
@@ -158,6 +160,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
       render();
     },
     aoSoltar: (payload, destino) => void soltar(payload, destino),
+    aoMoverPasta: (id) => void moverPastaPorMenu(id),
   };
 
   const painel = montarPainel(acoes, { doc, css: d.cssPainel });
@@ -309,22 +312,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
 
   async function soltar(payload: PayloadArrasto, destino: string | null): Promise<void> {
     if (payload.tipo === "pasta") {
-      if (destino === payload.id) return;
-      if (destino !== null && subarvoreContem(exibicao.pastas, payload.id, destino)) {
-        d.avisar("Uma pasta não pode ir para dentro dela mesma.");
-        return;
-      }
-      const nome = nomesDasPastas().get(payload.id) ?? "pasta";
-      const caminho = destino === null ? "a raiz" : caminhoDaPasta(exibicao.pastas, destino) || "a raiz";
-      if (!(await d.confirmar(`Você está movendo a PASTA "${nome}" (com subpastas e itens) para "${caminho}". Confirmar?`))) return;
-      if (!(await garantirEscrita())) return;
-      try {
-        await repo.moverPasta(payload.id, destino);
-        if (destino !== null) recolhidas.delete(destino);
-        await refrescar();
-      } catch (e) {
-        d.avisar(e instanceof Error ? e.message : String(e));
-      }
+      await moverPastaPara(payload.id, destino);
       return;
     }
 
@@ -341,6 +329,53 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     } catch (e) {
       d.avisar(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  async function moverPastaPara(id: string, destino: string | null): Promise<void> {
+    if (destino === id) {
+      d.avisar("Uma pasta não pode ir para dentro dela mesma.");
+      return;
+    }
+    if (destino !== null && subarvoreContem(exibicao.pastas, id, destino)) {
+      d.avisar("Uma pasta não pode ir para dentro de uma subpasta dela.");
+      return;
+    }
+    const nome = nomesDasPastas().get(id) ?? "pasta";
+    const caminho = destino === null ? "a raiz" : caminhoDaPasta(exibicao.pastas, destino) || "a raiz";
+    if (!(await d.confirmar(`Você está movendo a PASTA "${nome}" (com subpastas e itens) para "${caminho}". Confirmar?`))) return;
+    if (!(await garantirEscrita())) return;
+    try {
+      await repo.moverPasta(id, destino);
+      if (destino !== null) recolhidas.delete(destino);
+      await refrescar();
+    } catch (e) {
+      d.avisar(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function moverPastaPorMenu(id: string): Promise<void> {
+    const escolha = await d.escolherPasta(exibicao.pastas, paiDaPasta(id));
+    if (!escolha) return;
+    await moverPastaPara(id, escolha.pasta);
+  }
+
+  function paiDaPasta(id: string): string | null {
+    const achar = (lista: PastaExibida[]): PastaExibida | undefined => {
+      for (const p of lista) {
+        if (p.id === id) return p;
+        const f = achar(p.filhas);
+        if (f) return f;
+      }
+      return undefined;
+    };
+    return achar(exibicao.pastas)?.pai ?? null;
+  }
+
+  function focarPasta(id: string | null, tipo: "chevron" | "selecionar"): void {
+    const raizShadow = painel.host.shadowRoot;
+    if (!raizShadow) return;
+    const seletor = id === null ? ".sem-pasta" : tipo === "chevron" ? `[data-pasta-id="${id}"].chevron` : `[data-pasta-id="${id}"].pasta`;
+    (raizShadow.querySelector(seletor) as HTMLElement | null)?.focus();
   }
 
   function nomesDasPastas(): Map<string, string> {

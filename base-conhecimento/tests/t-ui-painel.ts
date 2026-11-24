@@ -55,6 +55,7 @@ function painel() {
       aoNovaPasta: registrar("aoNovaPasta"),
       aoRenomear: registrar("aoRenomear"),
       aoExcluir: registrar("aoExcluir"),
+      aoMoverPasta: registrar("aoMoverPasta"),
       aoMoverItem: registrar("aoMoverItem"),
       aoRemoverItem: registrar("aoRemoverItem"),
       aoBuscar: registrar("aoBuscar"),
@@ -142,7 +143,7 @@ await teste("acoes chamam os callbacks certos", () => {
 await teste("item move e orfao esquece", () => {
   const { p, chamadas, raiz } = painel();
   p.render(estado);
-  const mover = porTexto(raiz, "button", "Mover para…");
+  const mover = [...raiz.querySelectorAll(".item button")].find((b) => b.textContent === "Mover para…") as HTMLElement | undefined;
   checar("botao mover existe", mover !== undefined);
   if (mover) disparar(mover, "click");
   checar(
@@ -289,4 +290,19 @@ await teste("Sem pasta aceita soltar pasta", () => {
     "destino nulo",
     chamadas.some((c) => c.acao === "aoSoltar" && c.args[1] === null),
   );
+});
+
+await teste("menu da pasta tem Mover para e chama aoMoverPasta", () => {
+  const { p, chamadas, raiz } = painel();
+  p.render(estado);
+  const menu = raiz.querySelector('[aria-label="Ações da pasta"]') as HTMLElement;
+  menu.click();
+  const mover = [...raiz.querySelectorAll(".acoes button")].find((b) => b.textContent === "Mover para…") as HTMLElement;
+  checar("botao mover pasta", mover !== undefined);
+  if (mover) disparar(mover, "click");
+  checar(
+    "chamou aoMoverPasta",
+    chamadas.some((c) => c.acao === "aoMoverPasta" && c.args[0] === "p1"),
+  );
+  checar("data-pasta-id no chevron", raiz.querySelector('[data-pasta-id="p1"].chevron') !== null);
 });

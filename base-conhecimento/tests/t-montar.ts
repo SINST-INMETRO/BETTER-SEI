@@ -393,3 +393,35 @@ await teste("nova pasta nasce filha da selecionada e expande o pai", async () =>
   checar("pai expandido", s.querySelector('[aria-label="Recolher pasta Pai"]') !== null);
   desfazer();
 });
+
+await teste("menu Mover para da pasta move com confirmacao de pasta", async () => {
+  const textos: string[] = [];
+  const d = deps({
+    escolherPasta: async () => ({ pasta: "p1" }),
+    confirmar: async (t) => {
+      textos.push(t);
+      return true;
+    },
+  });
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": { id: "p1", nome: "Pai", pai: null, ordem: "a0", atualizadoEm: 1, dispositivo: "d1" },
+    "base-conhecimento/pastas/p2": { id: "p2", nome: "Filha", pai: null, ordem: "a1", atualizadoEm: 2, dispositivo: "d1" },
+  });
+  const desfazer = await montar(d);
+  const s = sombra(d.doc);
+  const filha = [...s.querySelectorAll(".pasta")].find((b) => b.textContent?.startsWith("Filha")) as HTMLElement;
+  const li = filha.closest("li") as HTMLElement;
+  const menu = li.querySelector('[aria-label="Ações da pasta"]') as HTMLElement;
+  menu.click();
+  const mover = [...li.querySelectorAll(".acoes button")].find((b) => b.textContent === "Mover para…") as HTMLElement;
+  checar("botao mover existe", mover !== undefined);
+  if (mover) disparar(mover, "click");
+  await esperar();
+  checar(
+    "confirmou pasta",
+    textos.some((t) => t.includes("PASTA") && t.includes("Filha")),
+  );
+  const p2 = (await d.area.obter("base-conhecimento/pastas/p2"))["base-conhecimento/pastas/p2"] as { pai: string | null } | undefined;
+  checar("moveu via menu", p2?.pai === "p1");
+  desfazer();
+});

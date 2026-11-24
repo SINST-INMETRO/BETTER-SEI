@@ -33,6 +33,7 @@ export interface AcoesPainel {
   aoNovaPasta(pai: string | null): void;
   aoRenomear(id: string): void;
   aoExcluir(id: string): void;
+  aoMoverPasta(id: string): void;
   aoMoverItem(agrupador: string): void;
   aoRemoverItem(agrupador: string): void;
   aoBuscar(texto: string): void;
@@ -196,6 +197,7 @@ export function montarPainel(
       chevron.setAttribute("type", "button");
       chevron.setAttribute("aria-expanded", recolhida ? "false" : "true");
       chevron.setAttribute("aria-label", `${recolhida ? "Expandir" : "Recolher"} pasta ${p.nome}`);
+      chevron.setAttribute("data-pasta-id", p.id);
       chevron.textContent = recolhida ? "▸" : "▾";
       chevron.addEventListener("click", () => acoes.aoAlternarPasta(p.id));
       linha.append(chevron);
@@ -207,6 +209,7 @@ export function montarPainel(
 
     const botao = el("button", "pasta");
     botao.setAttribute("type", "button");
+    botao.setAttribute("data-pasta-id", p.id);
     if (atual.selecionada === p.id) botao.setAttribute("aria-current", "true");
     const ic = icone("pasta", 18, doc);
     ic.setAttribute("aria-hidden", "true");
@@ -232,11 +235,15 @@ export function montarPainel(
     sub.setAttribute("type", "button");
     sub.textContent = "Nova subpasta";
     sub.addEventListener("click", () => acoes.aoNovaPasta(p.id));
+    const mover = el("button");
+    mover.setAttribute("type", "button");
+    mover.textContent = "Mover para…";
+    mover.addEventListener("click", () => acoes.aoMoverPasta(p.id));
     const excluir = el("button");
     excluir.setAttribute("type", "button");
     excluir.textContent = "Excluir";
     excluir.addEventListener("click", () => acoes.aoExcluir(p.id));
-    acoesDiv.append(renomear, sub, excluir);
+    acoesDiv.append(renomear, sub, mover, excluir);
     menu.addEventListener("click", () => acoesDiv.classList.toggle("oculto"));
 
     linha.append(botao, menu);

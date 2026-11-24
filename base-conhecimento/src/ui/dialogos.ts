@@ -3,7 +3,8 @@
  * confirmação e escolha de pasta.
  *
  * Acessibilidade: `role="dialog"`/`aria-modal`/`aria-labelledby`, foco inicial,
- * Tab preso, Escape cancela e devolve null/false. Nada de `window.prompt`/`confirm`.
+ * Tab preso (respeitando o retargeting do Shadow DOM), Escape cancela e o foco
+ * volta ao elemento de origem. Nada de `window.prompt`/`confirm`.
  */
 
 import { caminhoDaPasta, type PastaExibida } from "../arvore/mesclar";
@@ -20,6 +21,28 @@ interface Botao<T> {
   rotulo: string;
   primario?: boolean;
   valor: () => T;
+}
+
+/** O elemento focado de verdade, descendo por shadow roots (o document.activeElement é retargetado). */
+export function elementoAtivoProfundo(doc: Pick<Document, "activeElement">): HTMLElement | null {
+  let el = doc.activeElement as HTMLElement | null;
+  while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement as HTMLElement;
+  return el;
+}
+
+/** Próximo foco no ciclo do Tab dentro do modal; null = deixa o navegador seguir (está no meio). */
+export function proximoFoco(focaveis: HTMLElement[], atual: HTMLElement | null, shift: boolean): HTMLElement | null {
+  if (!focaveis.length) return null;
+  const i = atual ? focaveis.indexOf(atual) : -1;
+  if (i === -1) return shift ? (focaveis[focaveis.length - 1] ?? null) : (focaveis[0] ?? null);
+  if (shift && i === 0) return focaveis[focaveis.length - 1] ?? null;
+  if (!shift && i === focaveis.length - 1) return focaveis[0] ?? null;
+  return null;
+}
+
+/** A escolha viva do `<select>` (o atributo `selected` é só o valor de partida). */
+export function pastaDoSelect(select: Pick<HTMLSelectElement, "value">): { pasta: string | null } {
+  return { pasta: select.value === "" ? null : select.value };
 }
 
 export function criarDialogos(o: { doc?: Document; css?: string } = {}): Dialogos {
@@ -41,8 +64,19 @@ export function criarDialogos(o: { doc?: Document; css?: string } = {}): Dialogo
   let numero = 0;
   let focoAnterior: HTMLElement | null = null;
 
-  function abrir<T>(titulo: string, conteudo: HTMLElement, botoes: Array<Botao<T>>, cancelar: T): Promise<T> {
+  /** Foco inicial: campo em formulários; "Cancelar" em confirmações (ação destrutiva). */
+  type FocoInicial = "campo" | "cancelar";
+
+  function abrir<T>(
+    titulo: string,
+    conteudo: HTMLElement,
+    botoes: Array<Botao<T>>,
+    cancelar: T,
+    focoInicial: FocoInicial = "campo",
+  ): Promise<T> {
+    if (!overlay.hidden) return Promise.resolve(cancelar);
     overlay.replaceChildren();
+
     const caixa = doc.createElement("div");
     caixa.className = "caixa";
     caixa.setAttribute("role", "dialog");
@@ -70,7 +104,7 @@ export function criarDialogos(o: { doc?: Document; css?: string } = {}): Dialogo
     rodape.className = "rodape";
 
     overlay.hidden = false;
-    focoAnterior = (doc.activeElement as HTMLElement | null) ?? null;
+    focoAnterior = elementoAtivoProfundo(doc);
 
     return new Promise<T>((resolve) => {
       let aberto = true;
@@ -111,20 +145,20 @@ export function criarDialogos(o: { doc?: Document; css?: string } = {}): Dialogo
           const focaveis = [...caixa.querySelectorAll<HTMLElement>("button, input, select, a[href]")].filter(
             (el) => !el.hasAttribute("disabled"),
           );
-          if (!focaveis.length) return;
-          const atual = focaveis.indexOf(doc.activeElement as HTMLElement);
-          if (e.shiftKey && atual <= 0) {
+          const ativo = ((raiz as ShadowRoot).activeElement as HTMLElement | null) ?? elementoAtivoProfundo(doc);
+          const destino = proximoFoco(focaveis, ativo, e.shiftKey);
+          if (destino) {
             ev.preventDefault();
-            focaveis[focaveis.length - 1]?.focus();
-          } else if (!e.shiftKey && atual === focaveis.length - 1) {
-            ev.preventDefault();
-            focaveis[0]?.focus();
+            destino.focus();
           }
         }
       });
 
       overlay.appendChild(caixa);
-      (caixa.querySelector("input, select, .botao.primario") as HTMLElement | null)?.focus();
+      const alvo = (
+        focoInicial === "cancelar" ? rodape.querySelector(".botao") : caixa.querySelector("input, select, .botao.primario")
+      ) as HTMLElement | null;
+      alvo?.focus();
     });
   }
 
@@ -166,6 +200,7 @@ export function criarDialogos(o: { doc?: Document; css?: string } = {}): Dialogo
           { rotulo: "Confirmar", primario: true, valor: () => true },
         ],
         false,
+        "cancelar",
       );
     },
 
@@ -181,6 +216,7 @@ export function criarDialogos(o: { doc?: Document; css?: string } = {}): Dialogo
           { rotulo: rotuloOk, primario: true, valor: () => true },
         ],
         false,
+        "cancelar",
       );
     },
 
@@ -216,14 +252,7 @@ export function criarDialogos(o: { doc?: Document; css?: string } = {}): Dialogo
         corpo,
         [
           { rotulo: "Cancelar", valor: () => null },
-          {
-            rotulo: "Mover",
-            primario: true,
-            valor: () => {
-              const escolhida = select.querySelector("option[selected]") as HTMLOptionElement | null;
-              return { pasta: escolhida && escolhida.value !== "" ? escolhida.value : null };
-            },
-          },
+          { rotulo: "Mover", primario: true, valor: () => pastaDoSelect(select) },
         ],
         null,
       );
