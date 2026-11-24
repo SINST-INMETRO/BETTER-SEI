@@ -31,10 +31,13 @@ function indiceDaColuna(doc: Document, rotulo: string): number {
   return ths.findIndex((th) => texto(th) === rotulo);
 }
 
-/** O agrupador (estável entre versões) do vínculo de uma linha; null quando não há link de versões. */
+/** O agrupador (estável entre versões) do vínculo de uma linha; sem link de versões, o id da versão. */
 export function agrupadorDoTr(tr: Element): string | null {
-  const href = tr.querySelector('a[href*="base_conhecimento_versoes"]')?.getAttribute("href") ?? "";
-  return /[?&]id_base_conhecimento_agrupador=(\d+)/.exec(href)?.[1] ?? null;
+  const versoes = tr.querySelector('a[href*="base_conhecimento_versoes"]')?.getAttribute("href") ?? "";
+  const doAgrupador = /[?&]id_base_conhecimento_agrupador=(\d+)/.exec(versoes)?.[1];
+  if (doAgrupador) return doAgrupador;
+  const visualizar = desfazerAmp(tr.querySelector('a[href*="base_conhecimento_visualizar"]')?.getAttribute("href"));
+  return /[?&]id_base_conhecimento=(\d+)/.exec(visualizar)?.[1] ?? null;
 }
 
 /** Todos os itens de UMA página da lista. */
