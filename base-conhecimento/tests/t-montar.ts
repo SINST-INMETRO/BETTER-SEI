@@ -38,9 +38,9 @@ function deps(over: Partial<DepsMontar> = {}): DepsMontar {
     lerItens: async () => itensDaPagina(paginaFixture("base_conhecimento_listar.html")),
     armazem: () => armazemVazio(),
     perguntar: async () => true,
-    pedirTexto: () => "Fiscalizacao",
-    confirmar: () => true,
-    escolherPasta: () => ({ pasta: null }),
+    pedirTexto: async () => "Fiscalizacao",
+    confirmar: async () => true,
+    escolherPasta: async () => ({ pasta: null }),
     avisar: () => {},
     idDispositivo: "d1",
     cssPainel: "",
@@ -199,7 +199,7 @@ await teste("desfazer devolve a tabela nativa (sem a coluna Pasta)", async () =>
 
 await teste("mover item para a pasta e lista-lo na pasta selecionada", async () => {
   const d = deps({
-    escolherPasta: (pastas) => ({ pasta: pastas[0]?.id ?? null }),
+    escolherPasta: async (pastas) => ({ pasta: pastas[0]?.id ?? null }),
   });
   const desfazer = await montar(d);
   const s = sombra(d.doc);

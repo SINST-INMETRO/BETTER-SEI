@@ -61,9 +61,9 @@ export interface DepsMontar {
   lerItens: () => Promise<ItemBase[]>;
   armazem: () => ArmazemTexto;
   perguntar: Perguntar;
-  pedirTexto: (rotulo: string, valorInicial?: string) => string | null;
-  confirmar: (texto: string) => boolean;
-  escolherPasta: (pastas: PastaExibida[], atual: string | null) => { pasta: string | null } | null;
+  pedirTexto: (rotulo: string, valorInicial?: string) => Promise<string | null>;
+  confirmar: (texto: string) => Promise<boolean>;
+  escolherPasta: (pastas: PastaExibida[], atual: string | null) => Promise<{ pasta: string | null } | null>;
   avisar: (texto: string) => void;
   idDispositivo: string;
   cssPainel: string;
@@ -227,7 +227,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   }
 
   async function novaPasta(pai: string | null): Promise<void> {
-    const nome = d.pedirTexto("Nome da pasta", "");
+    const nome = await d.pedirTexto("Nome da pasta", "");
     if (nome === null) return;
     if (!(await garantirEscrita())) return;
     try {
@@ -242,7 +242,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
 
   async function renomear(id: string): Promise<void> {
     const atual = nomesDasPastas().get(id) ?? "";
-    const nome = d.pedirTexto("Renomear pasta", atual);
+    const nome = await d.pedirTexto("Renomear pasta", atual);
     if (nome === null) return;
     if (!(await garantirEscrita())) return;
     try {
@@ -254,7 +254,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   }
 
   async function excluir(id: string): Promise<void> {
-    if (!d.confirmar('Excluir a pasta? Os itens dela voltam para "Sem pasta".')) return;
+    if (!(await d.confirmar('Excluir a pasta? Os itens dela voltam para "Sem pasta".'))) return;
     if (!(await garantirEscrita())) return;
     try {
       await repo.excluirPasta(id);
@@ -267,7 +267,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
 
   async function moverItem(agrupador: string): Promise<void> {
     const vinculo = ent.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
-    const escolha = d.escolherPasta(exibicao.pastas, vinculo?.pasta ?? null);
+    const escolha = await d.escolherPasta(exibicao.pastas, vinculo?.pasta ?? null);
     if (!escolha) return;
     if (!(await garantirEscrita())) return;
     const item = itens.find((i) => i.agrupador === agrupador);
@@ -280,7 +280,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   }
 
   async function esquecer(agrupador: string): Promise<void> {
-    if (!d.confirmar("Esquecer este vinculo? O item continua no SEI.")) return;
+    if (!(await d.confirmar("Esquecer este vinculo? O item continua no SEI."))) return;
     if (!(await garantirEscrita())) return;
     try {
       await repo.removerVinculo(agrupador);
