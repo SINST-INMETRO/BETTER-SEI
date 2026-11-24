@@ -11,6 +11,7 @@ import { areaChrome } from "@comum/armazenamento/area";
 import { idDispositivo } from "@comum/armazenamento/dispositivo";
 import { lerOpcaoLegada, opcaoLegadaLigada } from "@comum/opcoes/legadas";
 import { travarComLocks, travarEsperando } from "@comum/sincronia/trava";
+import { avisar as avisarPro } from "@comum/ui/aviso";
 import { criarAbrirModal, criarConfirmar } from "@comum/ui/dialogo";
 import { linkDoMenu } from "@nucleo/links/links";
 import { lerContexto } from "@nucleo/sei";
@@ -19,7 +20,7 @@ import { paginaDe } from "@nucleo/sessao/pagina";
 import { caminhoDaPasta, type PastaExibida } from "./arvore/mesclar";
 import { lerItensDaUnidade } from "./nucleo/itens";
 import { armazemDoTexto } from "./pagina/armazem";
-import { montar, telaAtual } from "./pagina/montar";
+import { montar, quandoDomPronto, telaAtual } from "./pagina/montar";
 import cssPainel from "./ui/painel.css";
 
 const OPCAO = "baseconhecimento";
@@ -42,7 +43,7 @@ function escolherPasta(pastas: PastaExibida[], atual: string | null): { pasta: s
   indexar(pastas);
   const indiceAtual = opcoes.findIndex((o) => o.id === atual);
   const lista = opcoes.map((o, i) => `${i} = ${o.rotulo}`).join("\n");
-  const resposta = window.prompt(`Mover para qual pasta?\n${lista}`, String(indiceAtual < 0 ? 0 : indiceAtual));
+  const resposta = window.prompt(`Mover para qual pasta?\n${lista}`, String(Math.max(0, indiceAtual)));
   if (resposta === null) return null;
   const n = Number(resposta.trim());
   const escolha = Number.isInteger(n) ? opcoes[n] : undefined;
@@ -94,7 +95,7 @@ async function iniciar(): Promise<void> {
       pedirTexto: (rotulo, inicial) => window.prompt(rotulo, inicial ?? ""),
       confirmar: (texto) => window.confirm(texto),
       escolherPasta,
-      avisar: (texto) => console.warn("[SEI Pro] base-conhecimento:", texto),
+      avisar: (texto) => avisarPro(texto),
       idDispositivo: await idDispositivo(area),
       cssPainel,
       janela: window,
@@ -110,7 +111,6 @@ async function iniciar(): Promise<void> {
 async function partir(): Promise<void> {
   const tela = telaAtual();
   if (!tela) return;
-  document.documentElement.setAttribute(MARCA, "");
   if (tela === "pesquisar") {
     injetarAtalho();
     return;
@@ -136,4 +136,9 @@ async function partir(): Promise<void> {
   });
 }
 
-void partir();
+// Marca cedo (document_start) e só age quando o DOM existe: a leitura do menu e
+// da tabela depende da página pronta.
+document.documentElement.setAttribute(MARCA, "");
+quandoDomPronto(document, () => {
+  void partir();
+});

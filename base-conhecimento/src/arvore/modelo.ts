@@ -81,9 +81,9 @@ function versionadaValida(x: unknown): x is Versionada {
 export function pastaValida(x: unknown): x is Pasta {
   if (!versionadaValida(x)) return false;
   const p = x as Pasta;
+  if (!texto(p.nome)) return false;
   const nome = p.nome.trim();
   return (
-    texto(p.nome) &&
     nome.length >= 1 &&
     nome.length <= LIMITE_NOME_PASTA &&
     (p.pai === null || (texto(p.pai) && p.pai !== "")) &&

@@ -169,3 +169,16 @@ await teste("destruir remove o host e o css tem alvo de 44px e tokens aprovados"
   checar("token de texto", CSS.includes("#212529"));
   checar("token de azul SEI", CSS.includes("#155f9b"));
 });
+
+await teste("aviso de indisponivel e itens da pasta selecionada", () => {
+  const { p, chamadas, raiz } = painel();
+  p.render({ ...estado, aviso: "Indisponível nesta unidade.", itensDaSelecionada: [item("41", "ITEM DA PASTA")] });
+  checar("aviso", raiz.querySelector('.aviso[role="status"]')?.textContent === "Indisponível nesta unidade.");
+  const mover = [...raiz.querySelectorAll(".itens-pasta button")].find((b) => b.textContent === "Mover para…") as HTMLElement;
+  checar("item da pasta", mover !== undefined);
+  if (mover) disparar(mover, "click");
+  checar(
+    "move item da pasta",
+    chamadas.some((c) => c.acao === "aoMoverItem" && c.args[0] === "41"),
+  );
+});

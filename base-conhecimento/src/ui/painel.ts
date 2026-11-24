@@ -18,6 +18,10 @@ export interface EstadoPainel {
   orfaos: Vinculo[];
   selecionada: string | null;
   busca: string;
+  /** Faixa de aviso (ex.: "Indisponível nesta unidade"). */
+  aviso?: string;
+  /** Itens da pasta selecionada (para mover de pasta). */
+  itensDaSelecionada?: ItemBase[];
 }
 
 export interface AcoesPainel {
@@ -76,11 +80,19 @@ export function montarPainel(
   const arvore = doc.createElement("div");
   arvore.className = "arvore";
 
+  const avisoEl = doc.createElement("div");
+  avisoEl.className = "aviso";
+  avisoEl.setAttribute("role", "status");
+  avisoEl.hidden = true;
+
+  const itensPasta = doc.createElement("div");
+  itensPasta.className = "itens-pasta";
+
   const nota = doc.createElement("div");
   nota.className = "nota";
-  nota.textContent = "Arraste itens para uma pasta. No menu ⋯ da pasta: renomear, nova subpasta, excluir.";
+  nota.textContent = "Use Mover para… nos itens. No menu ⋯ da pasta: renomear, nova subpasta, excluir.";
 
-  painel.append(topo, arvore, nota);
+  painel.append(topo, avisoEl, arvore, itensPasta, nota);
   raiz.appendChild(painel);
 
   let atual: EstadoPainel = { pastas: [], semPasta: [], orfaos: [], selecionada: null, busca: "" };
@@ -161,10 +173,23 @@ export function montarPainel(
   function render(estado: EstadoPainel): void {
     atual = estado;
     arvore.replaceChildren();
+    avisoEl.hidden = !estado.aviso;
+    avisoEl.textContent = estado.aviso ?? "";
 
     const ul = el("ul");
     for (const p of estado.pastas) if (pastaCombina(p)) ul.append(linhaPasta(p));
     arvore.append(ul);
+
+    itensPasta.replaceChildren();
+    const daPasta = estado.itensDaSelecionada ?? [];
+    if (estado.selecionada !== null && daPasta.length) {
+      const rotuloSecao = el("div", "rotulo-secao");
+      rotuloSecao.textContent = "Itens desta pasta";
+      const ulPasta = el("ul");
+      for (const i of daPasta)
+        if (combina(i.titulo)) ulPasta.append(linhaItem(i.titulo, "Mover para…", () => acoes.aoMoverItem(i.agrupador), false));
+      itensPasta.append(rotuloSecao, ulPasta);
+    }
 
     const liSem = el("li");
     const linhaSem = el("div", "linha");

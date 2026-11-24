@@ -92,32 +92,33 @@ Nome do texto na unidade: **`[_SEIPRO_BC_UNIDADE]`** (segue o padrão
 `[_SEIPRO_FAV_…]`, `[_SEIPRO_DEM_…]`, `[_SEIPRO_PRJ_UNIDADE]`).
 
 ```ts
-/** Versão do formato. Sobe quando o envelope mudar de forma incompatível. */
-type VersaoEnvelope = 1;
-
-interface EnvelopeBaseConhecimento {
-  v: VersaoEnvelope;
-  unidade: string;                 // sigla/id da unidade dona da árvore
-  atualizadoEm: string;            // ISO 8601
-  autor: string;                   // login de quem gravou por último
-  arvore: {
-    pastas: Pasta[];
-    vinculos: Vinculo[];
-  };
+/** Contrato do codec: `formato`/`versao` no topo (é o que `versaoMaisNova` lê). */
+interface Envelope {
+  formato: "seipro-base-conhecimento";
+  versao: 1;                       // sobe só com mudança incompatível
+  host: string;                    // host do SEI (o texto não vale em outro SEI)
+  unidade: string;                 // id da unidade dona da árvore
+  entidades: { p: Pasta[]; v: Vinculo[] };
 }
 
 interface Pasta {
-  id: string;                      // id curto e estável (ex.: "p1", "p2"…)
-  nome: string;                    // 1..80 caracteres
+  id: string;                      // 10 hexadecimais aleatórios
+  nome: string;                    // 1..80 caracteres (aparados)
   pai: string | null;              // id da pasta pai; null = raiz
   ordem: string;                   // índice fracionário (ordenação manual)
+  atualizadoEm: number;            // carimbo da última alteração (ms)
+  dispositivo: string;             // desempate na mesclagem
+  removidoEm?: number;             // lápide (exclusão)
 }
 
 interface Vinculo {
-  agrupador: string;               // id_base_conhecimento_agrupador (estável entre versões)
-  titulo: string;                  // rótulo em cache (fallback e busca)
+  id: string;                      // = id_base_conhecimento_agrupador
+  titulo: string;                  // rótulo em cache (atualizado pela lista real)
   pasta: string | null;            // id da pasta; null = sem pasta
   ordem: string;                   // índice fracionário dentro da pasta
+  atualizadoEm: number;
+  dispositivo: string;
+  removidoEm?: number;
 }
 ```
 
@@ -125,35 +126,37 @@ Exemplo:
 
 ```json
 {
-  "v": 1,
-  "unidade": "Sinst",
-  "atualizadoEm": "2026-11-23T15:40:00-03:00",
-  "autor": "kwamado",
-  "arvore": {
-    "pastas": [
-      { "id": "p1", "nome": "Fiscalização", "pai": null, "ordem": "a0" },
-      { "id": "p2", "nome": "Notas Técnicas", "pai": "p1", "ordem": "a0" }
+  "formato": "seipro-base-conhecimento",
+  "versao": 1,
+  "host": "sei.exemplo.gov.br",
+  "unidade": "110000108",
+  "entidades": {
+    "p": [
+      { "id": "a1b2c3d4e5", "nome": "Fiscalização", "pai": null, "ordem": "a0", "atualizadoEm": 1, "dispositivo": "notebook" },
+      { "id": "f6e5d4c3b2", "nome": "Notas Técnicas", "pai": "a1b2c3d4e5", "ordem": "a0", "atualizadoEm": 2, "dispositivo": "notebook" }
     ],
-    "vinculos": [
-      { "agrupador": "40", "titulo": "[APENAS UM TESTE] COMO FAZER UMA NOTA TÉCNICA", "pasta": "p2", "ordem": "a0" }
+    "v": [
+      { "id": "40", "titulo": "COMO FAZER UMA NOTA TÉCNICA", "pasta": "f6e5d4c3b2", "ordem": "a0", "atualizadoEm": 3, "dispositivo": "notebook" }
     ]
   }
 }
 ```
 
-Regras que o código deve garantir:
+Regras que o código garante:
 
-- **Referência estável**: usar `agrupador`, nunca o id da versão
-  (`id_base_conhecimento` muda a cada nova versão).
+- **Referência estável**: usar o `agrupador` como id do vínculo, nunca o id da
+  versão (`id_base_conhecimento` muda a cada nova versão).
 - **Nada some**: excluir pasta nunca exclui item; os vínculos voltam a
-  `pasta: null` ("Sem pasta").
+  `pasta: null` ("Sem pasta") e as subpastas sobem um nível.
 - **Título é cache**: ao ler a lista, o `titulo` do vínculo é atualizado com o
-  título real; se o item sumiu, mantém o último e marca como removido.
-- **Limite de tamanho**: o Texto Padrão tem teto (~100 KB). Faixas de aviso em
-  85% e 100% (como em Demandas). Estimativa: ~80 bytes por vínculo e ~60 por
-  pasta → milhares de itens cabem.
-- **Migração**: `v` permite converter envelopes antigos; versão desconhecida é
-  preservada e não sobrescrita (evita perder dados de um colega com versão nova).
+  título real; vínculo para pasta removida volta a `pasta: null`.
+- **Integridade do `pai` na exibição**: a mesclagem por entidade pode deixar um
+  filho apontando para uma pasta apagada em outro computador; a exibição o põe
+  na raiz em vez de recusar o envelope inteiro (não perder dados).
+- **Limite de tamanho**: o Texto Padrão tem teto (~100 KB); o motor avisa em 80
+  KB e recusa acima de 100 KB. Estimativa: ~80 bytes por vínculo e ~60 por pasta.
+- **Migração**: `formato`/`versao` permitem converter envelopes antigos; versão
+  mais nova é preservada e nunca sobrescrita.
 
 ## Privacidade
 

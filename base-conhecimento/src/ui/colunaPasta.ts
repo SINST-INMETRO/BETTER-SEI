@@ -5,6 +5,10 @@
  * agrupador, pinta o caminho e esconde as linhas fora da pasta selecionada
  * (filtro de verdade; nada de esmaecer texto). O tablesorter reordena as linhas
  * sem recriá-las, então o filtro é reaplicado no `sortEnd`.
+ *
+ * Toda linha com `td` recebe a célula nova (inclusive a linha de filtros do
+ * tablesorter), para as colunas não desalinharem; só as linhas com agrupador são
+ * marcadas. `data-label` mantém a tabela responsiva legível.
  */
 
 export const ATRIBUTO_AGRUPADOR = "data-spro-agrupador";
@@ -28,18 +32,26 @@ export function prepararTabela(doc: Document, agrupadorDaLinha: (tr: HTMLTableRo
   }
 
   for (const tr of tabela.querySelectorAll("tr")) {
-    if (tr.hasAttribute(ATRIBUTO_AGRUPADOR)) continue;
-    const linha = tr as HTMLTableRowElement;
-    const primeiroTd = linha.querySelector("td");
+    const primeiroTd = tr.querySelector("td");
     if (!primeiroTd) continue;
-    const agrupador = agrupadorDaLinha(linha);
-    if (!agrupador) continue;
-    linha.setAttribute(ATRIBUTO_AGRUPADOR, agrupador);
+    if (tr.querySelector(`td[${ATRIBUTO_CELULA}]`)) continue;
+    const daLinha = tr.getAttribute(ATRIBUTO_AGRUPADOR) ?? agrupadorDaLinha(tr as HTMLTableRowElement);
+    if (daLinha) tr.setAttribute(ATRIBUTO_AGRUPADOR, daLinha);
     const td = doc.createElement("td");
     td.className = "spro-cel-pasta";
     td.setAttribute(ATRIBUTO_CELULA, "");
+    td.setAttribute("data-label", "Pasta");
     primeiroTd.after(td);
   }
+}
+
+/** Remove a coluna e as marcas: devolve a tabela nativa ao estado original. */
+export function removerTabela(doc: Document): void {
+  const tabela = tabelaDe(doc);
+  if (!tabela) return;
+  for (const th of tabela.querySelectorAll(`[${ATRIBUTO_TH}]`)) th.remove();
+  for (const td of tabela.querySelectorAll(`[${ATRIBUTO_CELULA}]`)) td.remove();
+  for (const tr of tabela.querySelectorAll(`[${ATRIBUTO_AGRUPADOR}]`)) tr.removeAttribute(ATRIBUTO_AGRUPADOR);
 }
 
 export function pintarPastas(doc: Document, rotuloDe: (agrupador: string) => string): void {
@@ -59,6 +71,15 @@ export function filtrarPorPasta(doc: Document, agrupadores: ReadonlySet<string> 
     const mostrar = agrupadores === null || agrupadores.has(agrupador);
     linha.style.display = mostrar ? "" : "none";
   }
+}
+
+/** Linhas de item visíveis no DOM (a tabela nativa pode estar paginada). */
+export function contarLinhasVisiveis(doc: Document): number {
+  let n = 0;
+  for (const tr of doc.querySelectorAll(`tr[${ATRIBUTO_AGRUPADOR}]`)) {
+    if ((tr as HTMLElement).style.display !== "none") n++;
+  }
+  return n;
 }
 
 export function atualizarCaption(doc: Document, total: number): void {

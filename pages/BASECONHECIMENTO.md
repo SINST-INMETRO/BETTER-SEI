@@ -9,7 +9,7 @@ A tela da **Base de Conhecimento** do SEI ganha uma navegação por **pastas hie
 - O painel **Pastas** aparece à esquerda da lista. Clique numa pasta para ver os itens dela; clique em **Sem pasta** para ver o que ainda não foi organizado.
 - **+ Nova pasta** cria uma pasta. O menu **⋯** de cada pasta tem **Renomear**, **Nova subpasta** e **Excluir**.
 - A lista ganha a coluna **Pasta**, que mostra o caminho de cada item. As linhas de outras pastas ficam ocultas quando você seleciona uma pasta (o filtro é de verdade, não é só esmaecer).
-- Para organizar um item, use **Mover para…** no item (na lista ou em "Sem pasta"). Para desfazer um vínculo, use **esquecer** nos itens que já não existem no SEI.
+- Para organizar um item, use **Mover para…** no item (nos itens listados sob a pasta selecionada ou em "Sem pasta"). Para desfazer um vínculo, use **esquecer** nos itens que já não existem no SEI.
 - O botão **Pastas**, na barra de comandos, alterna entre a visão em pastas e a lista plana.
 - A busca do painel filtra a árvore e a lista pelo título.
 

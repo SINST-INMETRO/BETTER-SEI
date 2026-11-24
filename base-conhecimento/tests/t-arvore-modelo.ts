@@ -80,3 +80,8 @@ await teste("pai apontando para pasta ausente nao invalida o envelope (resolvido
   const r = validarEnvelope(envelope({ p: [pasta({ id: "p1", pai: "sumiu" })] }), IDENT);
   checar("ok", "ok" in r);
 });
+
+await teste("nome que nao e texto e invalido sem lancar", () => {
+  checar("numero", !pastaValida(pasta({ nome: 123 })));
+  checar("ausente", !pastaValida({ ...pasta(), nome: undefined }));
+});

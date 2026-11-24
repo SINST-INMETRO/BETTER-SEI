@@ -7,19 +7,29 @@
  * do SEI: só em pastas e vínculos.
  *
  * As perguntas de UI (nome, confirmação, escolha de pasta, aviso) são injetadas
- * — o main usa prompt/confirm e o diálogo; os testes usam fakes.
+ * — o main usa prompt/confirm e o aviso do SEI Pro; os testes usam fakes.
  */
 
 import type { Area } from "@comum/armazenamento/area";
 import type { ArmazemTexto } from "@comum/sincronia/controlePagina";
+import type { StatusSync } from "@comum/sincronia/motor";
 import type { Travar, TravarEsperando } from "@comum/sincronia/trava";
 import { caminhoDaPasta, type Exibicao, montarExibicao, type PastaExibida, vinculosDesatualizados } from "../arvore/mesclar";
 import type { EntidadesArvore, IdentidadeArvore } from "../arvore/modelo";
 import { RepositorioArvore } from "../arvore/repositorio";
 import { agrupadorDoTr } from "../nucleo/itens";
 import type { ItemBase } from "../nucleo/tipos";
+import { chaveStatus } from "../sincronia/envelope";
 import { garantirBotaoPastas, ID_BOTAO, type Modo } from "../ui/botao";
-import { atualizarCaption, filtrarPorPasta, ligarAoSortDaTabela, pintarPastas, prepararTabela } from "../ui/colunaPasta";
+import {
+  atualizarCaption,
+  contarLinhasVisiveis,
+  filtrarPorPasta,
+  ligarAoSortDaTabela,
+  pintarPastas,
+  prepararTabela,
+  removerTabela,
+} from "../ui/colunaPasta";
 import { type AcoesPainel, montarPainel } from "../ui/painel";
 import { armazemNaTela } from "./armazem";
 import { consentimentoBase, type Perguntar, perguntarEntendi } from "./consentir";
@@ -33,6 +43,12 @@ export function telaAtual(url = globalThis.location?.href ?? ""): "listar" | "pe
     return null;
   }
   return acao === "base_conhecimento_listar" ? "listar" : acao === "base_conhecimento_pesquisar" ? "pesquisar" : null;
+}
+
+/** Roda `fn` quando o DOM estiver pronto (o content script nasce em document_start). */
+export function quandoDomPronto(doc: Pick<Document, "readyState" | "addEventListener">, fn: () => void): void {
+  if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", fn, { once: true });
+  else fn();
 }
 
 export interface DepsMontar {
@@ -58,6 +74,8 @@ export interface DepsMontar {
   travarEsperando?: TravarEsperando;
 }
 
+const AVISO_SO_LEITURA = "Indisponível nesta unidade: o SEI não deixa gravar o Texto Padrão com o seu perfil.";
+
 /** Monta tudo e devolve o desfazer. Nunca rejeita: falha de leitura devolve a tela nativa. */
 export async function montar(d: DepsMontar): Promise<() => void> {
   const doc = d.doc;
@@ -77,10 +95,19 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     carimbo: () => ({ agora: agora(), dispositivo: d.idDispositivo }),
   });
 
-  // Atualiza o título em cache dos vínculos (o real manda).
-  for (const v of vinculosDesatualizados(await repo.listar(), itens)) {
+  // Atualiza o título em cache dos vínculos (o real manda). Vínculo para pasta
+  // que não existe mais volta para "Sem pasta" em vez de derrubar a montagem.
+  const inicial = await repo.listar();
+  const vivas = new Set(inicial.p.filter((p) => p.removidoEm === undefined).map((p) => p.id));
+  for (const v of vinculosDesatualizados(inicial, itens)) {
     const item = itens.find((i) => i.agrupador === v.id);
-    if (item) await repo.moverVinculo(v.id, v.pasta, item.titulo);
+    if (!item) continue;
+    const destino = v.pasta !== null && vivas.has(v.pasta) ? v.pasta : null;
+    try {
+      await repo.moverVinculo(v.id, destino, item.titulo);
+    } catch (e) {
+      console.warn("[SEI Pro] base-conhecimento: nao foi possivel atualizar o titulo do vinculo:", e);
+    }
   }
 
   let ent: EntidadesArvore = await repo.listar();
@@ -88,6 +115,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   let selecionada: string | null = exibicao.pastas[0]?.id ?? null;
   let busca = "";
   let modo: Modo = "arvore";
+  let status: StatusSync | null = null;
 
   let sync: SincroniaBase | null = null;
   try {
@@ -141,6 +169,39 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   });
   const desligarSort = ligarAoSortDaTabela(doc, () => aplicarFiltro());
 
+  let vivo = true;
+
+  async function lerStatus(): Promise<void> {
+    status = ((await d.area.obter(chaveStatus))[chaveStatus] as StatusSync | undefined) ?? null;
+  }
+  await lerStatus();
+  const desligarStatus = d.area.aoMudar((m) => {
+    if (!(chaveStatus in m) || !vivo) return;
+    void lerStatus().then(() => {
+      if (vivo) render();
+    });
+  });
+
+  let refreshPendente = false;
+  const desligarMudancas = repo.aoMudar(() => {
+    if (!vivo || refreshPendente) return;
+    refreshPendente = true;
+    queueMicrotask(() => {
+      refreshPendente = false;
+      if (vivo) void refrescar().catch((e) => console.warn("[SEI Pro] base-conhecimento: atualizacao", e));
+    });
+  });
+
+  const somenteLeitura = (): boolean => status?.estado === "indisponivel";
+
+  async function garantirEscrita(): Promise<boolean> {
+    if (somenteLeitura()) {
+      d.avisar(status?.mensagem ?? AVISO_SO_LEITURA);
+      return false;
+    }
+    return garantirConsentimento();
+  }
+
   async function garantirConsentimento(): Promise<boolean> {
     const porta = consentimentoBase(d.sync, d.ident.host, d.contexto.login, d.contexto.unidade.id);
     if ((await porta.estado()) === "ligado") return true;
@@ -162,7 +223,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   async function novaPasta(pai: string | null): Promise<void> {
     const nome = d.pedirTexto("Nome da pasta", "");
     if (nome === null) return;
-    if (!(await garantirConsentimento())) return;
+    if (!(await garantirEscrita())) return;
     try {
       await repo.criarPasta(nome, pai);
       await refrescar();
@@ -175,7 +236,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     const atual = nomesDasPastas().get(id) ?? "";
     const nome = d.pedirTexto("Renomear pasta", atual);
     if (nome === null) return;
-    if (!(await garantirConsentimento())) return;
+    if (!(await garantirEscrita())) return;
     try {
       await repo.renomearPasta(id, nome);
       await refrescar();
@@ -186,27 +247,39 @@ export async function montar(d: DepsMontar): Promise<() => void> {
 
   async function excluir(id: string): Promise<void> {
     if (!d.confirmar('Excluir a pasta? Os itens dela voltam para "Sem pasta".')) return;
-    if (!(await garantirConsentimento())) return;
-    await repo.excluirPasta(id);
-    if (selecionada === id) selecionada = null;
-    await refrescar();
+    if (!(await garantirEscrita())) return;
+    try {
+      await repo.excluirPasta(id);
+      if (selecionada === id) selecionada = null;
+      await refrescar();
+    } catch (e) {
+      d.avisar(e instanceof Error ? e.message : String(e));
+    }
   }
 
   async function moverItem(agrupador: string): Promise<void> {
     const vinculo = ent.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
     const escolha = d.escolherPasta(exibicao.pastas, vinculo?.pasta ?? null);
     if (!escolha) return;
-    if (!(await garantirConsentimento())) return;
+    if (!(await garantirEscrita())) return;
     const item = itens.find((i) => i.agrupador === agrupador);
-    await repo.moverVinculo(agrupador, escolha.pasta, item?.titulo ?? vinculo?.titulo ?? "");
-    await refrescar();
+    try {
+      await repo.moverVinculo(agrupador, escolha.pasta, item?.titulo ?? vinculo?.titulo ?? "");
+      await refrescar();
+    } catch (e) {
+      d.avisar(e instanceof Error ? e.message : String(e));
+    }
   }
 
   async function esquecer(agrupador: string): Promise<void> {
     if (!d.confirmar("Esquecer este vinculo? O item continua no SEI.")) return;
-    if (!(await garantirConsentimento())) return;
-    await repo.removerVinculo(agrupador);
-    await refrescar();
+    if (!(await garantirEscrita())) return;
+    try {
+      await repo.removerVinculo(agrupador);
+      await refrescar();
+    } catch (e) {
+      d.avisar(e instanceof Error ? e.message : String(e));
+    }
   }
 
   function nomesDasPastas(): Map<string, string> {
@@ -226,6 +299,12 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     return new Set(ent.v.filter((v) => v.removidoEm === undefined && v.pasta === id).map((v) => v.id));
   }
 
+  function itensDaSelecionada(): ItemBase[] {
+    if (selecionada === null) return [];
+    const chaves = agrupadoresDaPasta(selecionada);
+    return itens.filter((i) => chaves.has(i.agrupador));
+  }
+
   function rotuloDe(agrupador: string): string {
     const vinculo = ent.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
     if (!vinculo || vinculo.pasta === null) return "Sem pasta";
@@ -240,12 +319,11 @@ export async function montar(d: DepsMontar): Promise<() => void> {
           ? null
           : new Set(itens.filter((i) => i.titulo.toLowerCase().includes(busca.trim().toLowerCase())).map((i) => i.agrupador));
       filtrarPorPasta(doc, filtro);
-      atualizarCaption(doc, filtro === null ? itens.length : itens.filter((i) => filtro.has(i.agrupador)).length);
+      atualizarCaption(doc, contarLinhasVisiveis(doc));
       return;
     }
-    const conjunto = agrupadoresDaPasta(selecionada);
-    filtrarPorPasta(doc, conjunto);
-    atualizarCaption(doc, itens.filter((i) => conjunto.has(i.agrupador)).length);
+    filtrarPorPasta(doc, agrupadoresDaPasta(selecionada));
+    atualizarCaption(doc, contarLinhasVisiveis(doc));
   }
 
   function render(): void {
@@ -255,6 +333,8 @@ export async function montar(d: DepsMontar): Promise<() => void> {
       orfaos: exibicao.orfaos,
       selecionada,
       busca,
+      aviso: somenteLeitura() ? (status?.mensagem ?? AVISO_SO_LEITURA) : undefined,
+      itensDaSelecionada: itensDaSelecionada(),
     });
     aplicarFiltro();
   }
@@ -262,13 +342,16 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   render();
 
   return () => {
+    vivo = false;
+    desligarMudancas();
+    desligarStatus();
     desligarSort();
     sync?.parar();
     painel.destruir();
     if (wrapper?.parentNode && areaTabela) wrapper.parentNode.insertBefore(areaTabela, wrapper);
     wrapper?.remove();
     doc.querySelector(`#${ID_BOTAO}`)?.remove();
-    filtrarPorPasta(doc, null);
-    atualizarCaption(doc, itens.length);
+    removerTabela(doc);
+    atualizarCaption(doc, contarLinhasVisiveis(doc));
   };
 }
