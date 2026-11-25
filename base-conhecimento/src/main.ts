@@ -18,6 +18,7 @@ import { paginaDe } from "@nucleo/sessao/pagina";
 import { lerItensDaUnidade } from "./nucleo/itens";
 import { armazemDoTexto } from "./pagina/armazem";
 import { montar, quandoDomPronto, telaAtual } from "./pagina/montar";
+import { lerIntencao, limparIntencao, montarFaixaDestino } from "./pagina/novaEmContexto";
 import { CHAVE_NUMERAR, lerNumeracao } from "./preferencias";
 import { criarAvisos } from "./ui/aviso";
 import cssAvisos from "./ui/aviso.css";
@@ -105,6 +106,22 @@ async function iniciar(): Promise<void> {
   }
 }
 
+/** Na tela de cadastro, mostra o destino da intenção antes de criar (só UI). */
+async function mostrarFaixa(): Promise<void> {
+  const ctx = lerContexto(pagina());
+  const area = areaChrome(chrome.storage.local, "local");
+  const intencao = await lerIntencao(area, { host: ctx.host, unidade: ctx.unidade.id });
+  if (!intencao) return;
+  const form =
+    document.querySelector<HTMLFormElement>("#frmBaseConhecimentoCadastro") ??
+    document.querySelector<HTMLFormElement>("#divInfraAreaTelaD form");
+  if (!form) return;
+  const faixa = montarFaixaDestino(document, intencao, () => {
+    void limparIntencao(area);
+  });
+  form.insertBefore(faixa.raiz, form.firstChild);
+}
+
 async function partir(): Promise<void> {
   const tela = telaAtual();
   if (!tela) return;
@@ -119,6 +136,12 @@ async function partir(): Promise<void> {
   } catch {
     ligada = true;
   }
+
+  if (tela === "cadastrar") {
+    if (ligada) await mostrarFaixa().catch((e) => console.warn("[SEI Pro] base-conhecimento:", e));
+    return;
+  }
+
   if (ligada) await iniciar().catch((e) => console.warn("[SEI Pro] base-conhecimento:", e));
 
   chrome.storage.onChanged.addListener((m, area) => {

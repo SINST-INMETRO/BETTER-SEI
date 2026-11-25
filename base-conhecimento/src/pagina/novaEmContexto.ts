@@ -78,3 +78,48 @@ export function sinalDeCriacao(url: string): { id: string } | null {
   if (!id || !ID_NUMERICO.test(id)) return null;
   return { id };
 }
+
+const CSS_FAIXA = `:host{all:initial}
+.faixa{display:flex;align-items:center;gap:12px;margin:0 0 10px;padding:8px 12px;border-radius:4px;background:#e7f0f8;color:#155f9b;font:12px system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.texto{flex:1}
+.nao-organizar{min-height: 44px;padding:0 10px;border:1px solid #155f9b;border-radius:4px;background:#fff;color:#155f9b;font:inherit;font-weight:600;cursor:pointer}
+.nao-organizar:hover{background:#d7e7f4}
+.nao-organizar:focus-visible{outline:2px solid #155f9b;outline-offset:2px}`;
+
+/**
+ * Faixa da tela de cadastro: mostra o destino antes de criar (visual do SEI,
+ * Shadow DOM). O botão limpa a intenção; falar com a área é de quem chama.
+ */
+export function montarFaixaDestino(doc: Document, intencao: Intencao, aoNaoOrganizar: () => void): { raiz: HTMLElement; destruir(): void } {
+  const host = doc.createElement("div");
+  host.className = "spro-bc-faixa";
+  const raiz = host.attachShadow({ mode: "open" });
+
+  const estilo = doc.createElement("style");
+  estilo.textContent = CSS_FAIXA;
+
+  const texto = doc.createElement("span");
+  texto.className = "texto";
+  texto.textContent = `Será organizado em: "${intencao.caminho}".`;
+
+  const botao = doc.createElement("button");
+  botao.type = "button";
+  botao.className = "nao-organizar";
+  botao.setAttribute("aria-label", "Não organizar");
+  botao.textContent = "Não organizar";
+
+  const caixa = doc.createElement("div");
+  caixa.className = "faixa";
+  caixa.append(texto, botao);
+  raiz.append(estilo, caixa);
+
+  const destruir = (): void => {
+    host.remove();
+  };
+  botao.addEventListener("click", () => {
+    destruir();
+    aoNaoOrganizar();
+  });
+
+  return { raiz: host, destruir };
+}

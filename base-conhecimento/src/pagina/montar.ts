@@ -38,14 +38,17 @@ import { consentimentoBase, type Perguntar, perguntarEntendi } from "./consentir
 import { gravarIntencao, lerIntencao, limparIntencao, sinalDeCriacao } from "./novaEmContexto";
 import { ligarSincronia, type SincroniaBase } from "./sincronia";
 
-export function telaAtual(url = globalThis.location?.href ?? ""): "listar" | "pesquisar" | null {
+export function telaAtual(url = globalThis.location?.href ?? ""): "listar" | "pesquisar" | "cadastrar" | null {
   let acao: string | null = null;
   try {
     acao = new URL(url).searchParams.get("acao");
   } catch {
     return null;
   }
-  return acao === "base_conhecimento_listar" ? "listar" : acao === "base_conhecimento_pesquisar" ? "pesquisar" : null;
+  if (acao === "base_conhecimento_listar") return "listar";
+  if (acao === "base_conhecimento_pesquisar") return "pesquisar";
+  if (acao === "base_conhecimento_cadastrar") return "cadastrar";
+  return null;
 }
 
 /** Roda `fn` quando o DOM estiver pronto (o content script nasce em document_start). */

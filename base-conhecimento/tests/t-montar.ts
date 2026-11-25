@@ -69,6 +69,7 @@ await teste("telaAtual identifica as telas certas", () => {
   checar("listar", telaAtual(URL_LISTAR) === "listar");
   checar("pesquisar", telaAtual("https://sei.exemplo.gov.br/sei/controlador.php?acao=base_conhecimento_pesquisar") === "pesquisar");
   checar("outra", telaAtual("https://sei.exemplo.gov.br/sei/controlador.php?acao=procedimento_controlar") === null);
+  checar("cadastrar", telaAtual("https://sei.exemplo.gov.br/sei/controlador.php?acao=base_conhecimento_cadastrar") === "cadastrar");
   checar("sem url", telaAtual("nao-e-url") === null);
 });
 

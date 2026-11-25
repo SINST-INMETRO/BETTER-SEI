@@ -1,6 +1,14 @@
 import { areaMemoria } from "@comum/armazenamento/area";
-import { CHAVE_INTENCAO, gravarIntencao, lerIntencao, limparIntencao, sinalDeCriacao, TTL_INTENCAO_MS } from "../src/pagina/novaEmContexto";
-import { checar, teste } from "./util";
+import {
+  CHAVE_INTENCAO,
+  gravarIntencao,
+  lerIntencao,
+  limparIntencao,
+  montarFaixaDestino,
+  sinalDeCriacao,
+  TTL_INTENCAO_MS,
+} from "../src/pagina/novaEmContexto";
+import { checar, docDe, teste } from "./util";
 
 const IDENT = { host: "sei.exemplo.gov.br", unidade: "110000108" };
 const AGORA = 1_000_000;
@@ -47,4 +55,26 @@ await teste("sinalDeCriacao le o retorno do cadastro", () => {
   checar("id nao numerico", sinalDeCriacao(URL_RETORNO.replace("id_base_conhecimento=54", "id_base_conhecimento=abc")) === null);
   checar("sem id", sinalDeCriacao(URL_RETORNO.replace("&id_base_conhecimento=54", "")) === null);
   checar("url invalida", sinalDeCriacao("nao-e-url") === null);
+});
+
+await teste("montarFaixaDestino mostra o destino e cancela", () => {
+  const doc = docDe("<html><body><form id='f'><input name='x'></form></body></html>");
+  const form = doc.getElementById("f") as HTMLElement;
+  let cancelou = 0;
+  const faixa = montarFaixaDestino(
+    doc,
+    { host: "sei.exemplo.gov.br", unidade: "1", pastaId: "p1", caminho: "1. Fiscalização", criadoEm: 1 },
+    () => {
+      cancelou += 1;
+    },
+  );
+  form.insertBefore(faixa.raiz, form.firstChild);
+  const sombra = faixa.raiz.shadowRoot as unknown as DocumentFragment;
+  checar("texto com o caminho", sombra.querySelector(".texto")?.textContent === 'Será organizado em: "1. Fiscalização".');
+  const botao = sombra.querySelector(".nao-organizar") as HTMLElement;
+  checar("botao rotulado", botao !== null && botao.textContent === "Não organizar" && botao.getAttribute("aria-label") === "Não organizar");
+  checar("alvo de 44px", (sombra.querySelector("style")?.textContent ?? "").includes("min-height: 44px"));
+  botao.click();
+  checar("faixa removida", !form.contains(faixa.raiz));
+  checar("cancelou", cancelou === 1);
 });
