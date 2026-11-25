@@ -631,3 +631,88 @@ await teste("Nova com pasta selecionada grava a intencao e a volta usa o caminho
   );
   desfazer2();
 });
+
+await teste("Entendi e organizar nao sobrescreve vinculo de colega criado depois", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const d = deps({ url: URL_RETORNO, avisar });
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  await gravarIntencao(d.area, IDENT, "p1", "Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  const acao = avisos.find((a) => a.acao?.rotulo === "Entendi e organizar")?.acao;
+  checar("acao presente", acao !== undefined);
+  await d.area.gravar({
+    "base-conhecimento/pastas/p2": { ...PASTA_P1, id: "p2", nome: "Colega", ordem: "a1" },
+    "base-conhecimento/vinculos/40": {
+      id: "40",
+      titulo: "PROCEDIMENTO DE EXEMPLO A",
+      pasta: "p2",
+      ordem: "a0",
+      atualizadoEm: 500,
+      dispositivo: "d2",
+    },
+  });
+  acao?.fazer();
+  await esperar();
+  checar("continua na pasta do colega", (await vinculoDaArea(d, AGRUPADOR_42))?.pasta === "p2");
+  checar("sem lapide", (await vinculoDaArea(d, AGRUPADOR_42))?.removidoEm === undefined);
+  checar("intencao limpa", !(CHAVE_INTENCAO in (await d.area.obter(CHAVE_INTENCAO))));
+  desfazer();
+});
+
+await teste("Desfazer nao apaga a reorganizacao feita por um colega depois", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const d = deps({ url: URL_RETORNO, avisar });
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  await consentimentoBase(d.sync, IDENT.host, "usuario.teste", IDENT.unidade).definir("ligado");
+  await gravarIntencao(d.area, IDENT, "p1", "Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  const acao = avisos.find((a) => a.acao?.rotulo === "Desfazer")?.acao;
+  checar("tem desfazer", acao !== undefined);
+  await d.area.gravar({
+    "base-conhecimento/pastas/p2": { ...PASTA_P1, id: "p2", nome: "Colega", ordem: "a1" },
+    "base-conhecimento/vinculos/40": {
+      id: "40",
+      titulo: "PROCEDIMENTO DE EXEMPLO A",
+      pasta: "p2",
+      ordem: "a0",
+      atualizadoEm: 500,
+      dispositivo: "d2",
+    },
+  });
+  acao?.fazer();
+  await esperar();
+  checar("continua em p2", (await vinculoDaArea(d, AGRUPADOR_42))?.pasta === "p2");
+  checar("sem lapide", (await vinculoDaArea(d, AGRUPADOR_42))?.removidoEm === undefined);
+  checar(
+    "aviso explica",
+    avisos.some((a) => a.texto === "A organização deste documento mudou; nada foi desfeito."),
+  );
+  desfazer();
+});
+
+await teste("modo lista nao captura intencao ao clicar em Nova", async () => {
+  const d = deps();
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1, spro_bc_modo: "lista" });
+  const desfazer = await montar(d);
+  await esperar();
+  disparar(d.doc.querySelector("#btnNova") as Element, "click");
+  await esperar();
+  checar("sem intencao", !(CHAVE_INTENCAO in (await d.area.obter(CHAVE_INTENCAO))));
+  desfazer();
+});
+
+await teste("falha de storage na intencao nao derruba o montar", async () => {
+  const base = areaMemoria();
+  const area = {
+    ...base,
+    async obter(chaves?: string | string[] | null) {
+      if (chaves === CHAVE_INTENCAO) throw new Error("storage falhou");
+      return base.obter(chaves);
+    },
+  };
+  const d = deps({ area, url: URL_RETORNO, numerar: true });
+  const desfazer = await montar(d);
+  checar("painel montado", d.doc.querySelector(".spro-bc-host") !== null);
+  desfazer();
+  checar("limpeza removeu o painel", d.doc.querySelector(".spro-bc-host") === null);
+});

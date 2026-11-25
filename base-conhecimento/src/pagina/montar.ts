@@ -193,7 +193,8 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   // intenção de uso único; o retorno do cadastro (sinal na URL) a consome.
   const btnNova = doc.querySelector("#btnNova");
   const aoClicarNova = (): void => {
-    if (selecionada === null) return;
+    // Na lista plana não há pasta visível selecionada: nada de contexto às cegas.
+    if (modo !== "arvore" || selecionada === null) return;
     const caminho = caminhoDaPasta(exibicao.pastas, selecionada, d.numerar);
     if (caminho === "") return; // a pasta selecionada não está mais na árvore viva
     void gravarIntencao(d.area, d.ident, selecionada, caminho, agora());
@@ -507,17 +508,39 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     }
 
     const mover = async (): Promise<void> => {
+      // Relê antes de gravar: o aviso com ação pode ter esperado um colega
+      // organizar o item nesse meio-tempo (regra 6).
+      const atual = await repo.listar();
+      const existente = atual.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
+      if (existente && existente.pasta !== null) {
+        await limparIntencao(d.area);
+        return;
+      }
       await repo.moverVinculo(agrupador, intencao.pastaId, item.titulo);
+      const criado = (await repo.listar()).v.find((v) => v.id === agrupador && v.removidoEm === undefined);
+      const carimbo = criado ? { atualizadoEm: criado.atualizadoEm, dispositivo: criado.dispositivo } : null;
       await limparIntencao(d.area);
       recolhidas.delete(intencao.pastaId);
       await refrescar();
       d.avisar(`Documento criado em "${intencao.caminho}".`, {
         rotulo: "Desfazer",
         fazer: () => {
-          void repo
-            .removerVinculo(agrupador)
-            .then(() => refrescar())
-            .catch((e) => d.avisar(e instanceof Error ? e.message : String(e)));
+          void (async () => {
+            const agoraEnt = await repo.listar();
+            const atualLink = agoraEnt.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
+            const aindaNosso =
+              atualLink !== undefined &&
+              atualLink.pasta === intencao.pastaId &&
+              carimbo !== null &&
+              atualLink.atualizadoEm === carimbo.atualizadoEm &&
+              atualLink.dispositivo === carimbo.dispositivo;
+            if (!aindaNosso) {
+              d.avisar("A organização deste documento mudou; nada foi desfeito.");
+              return;
+            }
+            await repo.removerVinculo(agrupador);
+            await refrescar();
+          })().catch((e) => d.avisar(e instanceof Error ? e.message : String(e)));
         },
       });
     };
@@ -540,8 +563,8 @@ export async function montar(d: DepsMontar): Promise<() => void> {
               return;
             }
             await porta.definir("ligado");
-            await mover().catch((e) => d.avisar(e instanceof Error ? e.message : String(e)));
-          })();
+            await mover();
+          })().catch((e) => d.avisar(e instanceof Error ? e.message : String(e)));
         },
       });
       return;
@@ -555,7 +578,8 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   }
 
   render();
-  await aplicarIntencao();
+  // A intenção é acessório: falha de storage não derruba a tela já montada.
+  await aplicarIntencao().catch((e) => console.warn("[SEI Pro] base-conhecimento: intencao:", e));
 
   return () => {
     vivo = false;
