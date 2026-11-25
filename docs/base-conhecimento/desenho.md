@@ -29,6 +29,7 @@ no espírito de Confluence/ClickUp, sem mexer no dado nativo do SEI:
 | Lista da unidade | `base_conhecimento_listar` | Árvore + área da pasta (a tela principal do módulo) |
 | Busca | `base_conhecimento_pesquisar` | Atalho/entrada para a árvore; busca global continua nativa |
 | Item | `base_conhecimento_visualizar` | **Não injeta** (é a página nativa do item) |
+| Cadastro | `base_conhecimento_cadastrar` | Faixa “Será organizado em: …” + **Não organizar** (só quando há pasta selecionada) |
 
 ## Wireframe
 
@@ -213,3 +214,27 @@ base-conhecimento/
    fora do escopo da árvore.
 4. **Permissão de escrita no Texto Padrão** — se o usuário não puder alterar,
    a árvore fica em modo leitura ("Indisponível nesta unidade").
+
+## Criar em contexto (25/11/2026)
+
+O **Nova** nativo do SEI cria o item no nível dele; o SEI Pro só o organiza na volta.
+O sinal ao vivo é a URL `base_conhecimento_listar&acao_origem=base_conhecimento_cadastrar&id_base_conhecimento=<id>&resultado=1`.
+
+1. **Criar em contexto, nunca às cegas.** Só há intenção quando uma pasta está selecionada ao clicar em **Nova**. "Sem pasta"/nada selecionado = comportamento atual (raiz).
+2. **Mostrar o destino antes.** Na tela de cadastro, faixa no visual do SEI: “Será organizado em: `{caminho}`” com **Não organizar** (limpa a intenção; nada é gravado).
+3. **Nunca silencioso.** Ao voltar, um aviso diz onde o documento ficou — ou o que impediu a organização.
+4. **Desfazer.** O aviso de sucesso tem **Desfazer**, que devolve o item a "Sem pasta".
+5. **Intenção de uso único e com prazo.** Vale uma vez, expira em 10 min (`spro_bc_nova_pasta`, `chrome.storage.local`) e é limpa ao aplicar, cancelar, voltar sem o sinal, host/unidade diferente ou pasta removida.
+6. **Nunca sobrescrever organização existente.** Item com vínculo vivo em outra pasta: intenção descartada, sem aviso e sem gravação.
+7. **Consentimento e permissão (decisão A).** Sem o "Entendi" ou em modo leitura, não organiza: fica em "Sem pasta" e o aviso oferece **Entendi e organizar** (pergunta o "Entendi" e associa); recusar limpa a intenção. Leitura estrita não oferece a ação.
+8. **Concorrência segura.** A associação usa `repo.moverVinculo` (upsert com carimbo); a mesclagem do motor segue intacta.
+9. **Só no fluxo de criação.** Nada em edição ou "Nova versão" (o vínculo é pelo `agrupador`, estável entre versões).
+10. **Acessibilidade.** Faixa e aviso com contraste AA, ação por teclado (44 px, foco visível), `role=status`/`aria-live` no aviso; sem `window.prompt`/`confirm`.
+
+## Numeração (25/11/2026)
+
+- **Formato posicional:** `1.`, `1.1`, `1.1.1` — posição dos irmãos na árvore exibida, recalculada na exibição. Mover ou inserir pasta renumera os irmãos; nada é gravado.
+- **Preferência:** `spro_bc_numerar` em `chrome.storage.local` (`"sim"`/`"nao"`), **padrão desligada**, por navegador — só apresentação, nunca entra no Texto Padrão.
+- **Onde aparece (ligada):** árvore, coluna "Pasta", diálogo "Mover para…", avisos e faixa do cadastro. "Sem pasta" nunca é numerado.
+- **Ao vivo:** trocar a preferência remonta o módulo (a árvore volta ao estado padrão de recolhidas/seleção).
+- **Onde configurar:** aba **Conhecimento** do painel lateral (`html/base-conhecimento.html`), que só aparece quando `js/init_base_conhecimento.js` está no manifest (padrão `temX` do shell).

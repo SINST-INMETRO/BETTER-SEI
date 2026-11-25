@@ -13,6 +13,8 @@ A tela da **Base de Conhecimento** do SEI ganha uma navegação por **pastas hie
 - **Documentos dentro da pasta**: ao expandir uma pasta, os documentos aparecem na árvore; clicar no nome abre o item no SEI (nova aba).
 - Para organizar, **arraste** um documento ou uma pasta para outra pasta (ou para "Sem pasta", que devolve o documento à lista sem pasta; uma pasta solta em "Sem pasta" vai para a raiz). Toda soltura pede **confirmação**; ao mover uma **pasta**, o aviso deixa claro que ela vai com subpastas e itens. Também dá para usar **Mover para…** no documento. Para desfazer um vínculo de item que já não existe no SEI, use **esquecer**.
 - O botão **Pastas**, na barra de comandos, alterna entre a visão em pastas e a lista plana.
+- **Criar dentro da pasta**: com uma pasta selecionada, clicar em **Nova** (o botão nativo do SEI) faz o item nascer já organizado nela. A tela de cadastro mostra a faixa “Será organizado em: …” com o botão **Não organizar** (cancela a organização, nada é gravado). Ao voltar, o aviso diz onde o documento ficou e oferece **Desfazer**; sem o **"Entendi"**, o item fica em **Sem pasta** e o aviso oferece **Entendi e organizar**.
+- **Numeração de pastas**: na aba **Conhecimento** do painel lateral (clique no ícone da extensão ao lado da barra de endereço), ligue **Numerar pastas** para ver `1. Pasta`, `1.1 Sub-pasta`, `1.1.1 Sub-sub-pasta` na árvore, nos caminhos e na coluna **Pasta**. A numeração é posicional (mover ou reordenar renumera), vale só naquele navegador e não altera o dado compartilhado da unidade.
 - A busca do painel filtra a árvore e a lista pelo título.
 - Nomear, renomear, confirmar e escolher pasta usam **diálogos no padrão do SEI**; os avisos aparecem numa barra azul no topo, no visual do SEI.
 
