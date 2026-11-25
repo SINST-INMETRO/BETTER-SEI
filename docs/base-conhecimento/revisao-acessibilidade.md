@@ -66,3 +66,20 @@ Os contrastes foram calculados a partir dos tokens fixos do CSS (não dependem d
 4. Teclado só: abrir diálogo (Enter), confirmar/cancelar (Tab/Enter/Escape), mover item pelo menu e por arrastar.
 
 > Nota: a medição acima depende de recarregar a extensão no navegador; os valores de contraste e os comportamentos de ARIA já estão fixados no CSS e nos testes deste repositório.
+
+## Criar em contexto e numeração (25/11/2026)
+
+Acréscimos ao escopo da auditoria (fixados em CSS/testes; medição ao vivo pendente de recarregar a extensão):
+
+| Elemento | Frente | Fundo | Razão | Exigido | Passa? |
+|---|---|---|---|---|---|
+| Faixa do cadastro | #155f9b | #e7f0f8 | 5,80:1 | 4,5:1 | ✅ |
+| Botão "Não organizar" | #155f9b | #ffffff | 6,68:1 | 4,5:1 | ✅ |
+| Ação do aviso ("Desfazer"/"Entendi e organizar") | #155f9b | #ffffff | 6,68:1 | 4,5:1 | ✅ |
+| Página da aba "Conhecimento" | #212529 / #495057 | #ffffff | 15,43:1 / 8,18:1 | 4,5:1 | ✅ |
+
+- **Faixa do cadastro**: Shadow DOM, texto por `textContent`, botão "Não organizar" com `aria-label`, alvo de **44 px** e `:focus-visible` (o botão fica no fluxo do formulário; nenhuma armadilha de foco).
+- **Aviso com ação**: além de `role="status"`/`aria-live="polite"`, o botão de ação herda o alvo de 44 px e tem `aria-label` igual ao rótulo; **não expira sozinho** (espera a pessoa), e o X continua fechando.
+- **Aba "Conhecimento"**: interruptor é `<label>` + `<input type="checkbox">` nativo (nome acessível "Numerar pastas"), alvo de 44 px na linha e foco visível; a explicação e a nota usam texto real (sem `innerHTML`).
+- **Numeração**: é só texto exibido após o nome (`textContent`); não altera `aria-label` de chevrons, não muda o nome anunciado e não entra no Texto Padrão.
+- Medir ao vivo: contraste da faixa e dos botões, foco por teclado na faixa do cadastro e no interruptor da aba, e o anúncio do aviso com ação.

@@ -18,6 +18,8 @@ import { paginaDe } from "@nucleo/sessao/pagina";
 import { lerItensDaUnidade } from "./nucleo/itens";
 import { armazemDoTexto } from "./pagina/armazem";
 import { montar, quandoDomPronto, telaAtual } from "./pagina/montar";
+import { lerIntencao, limparIntencao, montarFaixaDestino } from "./pagina/novaEmContexto";
+import { CHAVE_NUMERAR, lerNumeracao } from "./preferencias";
 import { criarAvisos } from "./ui/aviso";
 import cssAvisos from "./ui/aviso.css";
 import { criarDialogos } from "./ui/dialogos";
@@ -58,6 +60,7 @@ async function iniciar(): Promise<void> {
     const ctx = lerContexto(pagina());
     const area = areaChrome(chrome.storage.local, "local");
     const sync = areaChrome(chrome.storage.sync, "sync");
+    const numerar = await lerNumeracao(area);
     const dialogos = criarDialogos({ css: cssDialogos });
     const avisos = criarAvisos({ css: cssAvisos });
     const sessao = { http: criarHttp(location.href), linkMenu: (acao: string) => linkDoMenu(pagina(), acao) };
@@ -78,10 +81,11 @@ async function iniciar(): Promise<void> {
         perguntar: (texto, ok, nao) => dialogos.perguntar(texto, ok, nao),
         pedirTexto: (rotulo, inicial) => dialogos.pedirTexto(rotulo, inicial),
         confirmar: (texto) => dialogos.confirmar(texto),
-        escolherPasta: (pastas, atual) => dialogos.escolherPasta(pastas, atual),
-        avisar: (texto) => avisos.avisar(texto),
+        escolherPasta: (pastas, atual, numerar) => dialogos.escolherPasta(pastas, atual, numerar),
+        avisar: (texto, acao) => avisos.avisar(texto, acao),
         idDispositivo: await idDispositivo(area),
         cssPainel,
+        numerar,
         janela: window,
         docEventos: document,
         travar: travarComLocks,
@@ -102,6 +106,22 @@ async function iniciar(): Promise<void> {
   }
 }
 
+/** Na tela de cadastro, mostra o destino da intenção antes de criar (só UI). */
+async function mostrarFaixa(): Promise<void> {
+  const ctx = lerContexto(pagina());
+  const area = areaChrome(chrome.storage.local, "local");
+  const intencao = await lerIntencao(area, { host: ctx.host, unidade: ctx.unidade.id });
+  if (!intencao) return;
+  const form =
+    document.querySelector<HTMLFormElement>("#frmBaseConhecimentoCadastro") ??
+    document.querySelector<HTMLFormElement>("#divInfraAreaTelaD form");
+  if (!form) return;
+  const faixa = montarFaixaDestino(document, intencao, () => {
+    void limparIntencao(area);
+  });
+  form.insertBefore(faixa.raiz, form.firstChild);
+}
+
 async function partir(): Promise<void> {
   const tela = telaAtual();
   if (!tela) return;
@@ -116,6 +136,12 @@ async function partir(): Promise<void> {
   } catch {
     ligada = true;
   }
+
+  if (tela === "cadastrar") {
+    if (ligada) await mostrarFaixa().catch((e) => console.warn("[SEI Pro] base-conhecimento:", e));
+    return;
+  }
+
   if (ligada) await iniciar().catch((e) => console.warn("[SEI Pro] base-conhecimento:", e));
 
   chrome.storage.onChanged.addListener((m, area) => {
@@ -127,6 +153,15 @@ async function partir(): Promise<void> {
     } else if (!desfazer) {
       void iniciar().catch((e) => console.warn("[SEI Pro] base-conhecimento:", e));
     }
+  });
+
+  // Numeração: só apresentação, por navegador (chrome.storage.local). Trocar a
+  // preferência remonta a tela; a árvore volta ao estado padrão.
+  chrome.storage.onChanged.addListener((m, area) => {
+    if (area !== "local" || !(CHAVE_NUMERAR in m) || !desfazer) return;
+    desfazer();
+    desfazer = null;
+    void iniciar().catch((e) => console.warn("[SEI Pro] base-conhecimento:", e));
   });
 }
 

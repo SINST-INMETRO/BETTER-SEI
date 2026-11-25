@@ -36,6 +36,20 @@ Ambiente de referência: SEI 5.0.4 (INMETRO), unidade de teste. Use **somente le
 - [ ] **Duas pessoas**: com dois perfis, criar pastas diferentes ao mesmo tempo; as duas aparecem após a sincronia (mais recente vence por pasta).
 - [ ] **Sem permissão de alterar**: usar um perfil que só lê Textos Padrão; a árvore fica em leitura ("Indisponível nesta unidade").
 
+## Criar em contexto e numeração (25/11/2026)
+
+- [ ] **Criar dentro da pasta**: selecionar "Fiscalização" → clicar **Nova** → a tela de cadastro mostra a faixa “Será organizado em: …” com o caminho (numerado, se a numeração estiver ligada) → salvar → ao voltar, o item aparece na pasta e o aviso “Documento criado em …” oferece **Desfazer**.
+- [ ] **Desfazer**: no aviso, clicar **Desfazer**; o item volta a "Sem pasta" e a pasta deixa de mostrá-lo.
+- [ ] **Não organizar**: repetir com uma pasta selecionada e, na tela de cadastro, clicar **Não organizar**; salvar; o item fica em "Sem pasta" e nenhum vínculo novo aparece.
+- [ ] **Voltar sem criar**: clicar **Nova** e cancelar/voltar sem salvar; ao voltar para a lista a intenção foi limpa (nada é organizado depois).
+- [ ] **Sem o "Entendi"**: com o consentimento limpo (outro navegador/perfil), criar com pasta selecionada; o item fica em "Sem pasta" e o aviso oferece **Entendi e organizar**; aceitar o "Entendi" organiza o item.
+- [ ] **Colega organizou antes**: com dois perfis, um organiza o item recém-criado antes de o outro voltar; o segundo **não** sobrescreve a pasta do colega.
+- [ ] **Pasta removida**: selecionar uma pasta, clicar **Nova** e, em outra aba, excluir a pasta antes de salvar; ao voltar, o aviso diz que a pasta não existe mais e o item fica em "Sem pasta".
+- [ ] **Numeração ligada**: na aba **Conhecimento** do painel lateral (ícone da extensão), marcar **Numerar pastas**; a árvore, a coluna "Pasta" e o diálogo "Mover para…" passam a mostrar "1. …", "1.1 …", "1.1.1 …".
+- [ ] **Renumeração**: com a numeração ligada, mover uma pasta (ou criar uma pasta no topo); os números dos irmãos mudam na hora. Conferir no Texto Padrão `[_SEIPRO_BC_UNIDADE]` que **não** há números gravados.
+- [ ] **Escopo da numeração**: recarregar o navegador; a preferência continua. Abrir outro navegador/perfil; a numeração começa **desligada** (é por navegador).
+- [ ] **Aba condicional**: num pacote sem `js/init_base_conhecimento.js` no manifest, a aba "Conhecimento" não aparece no painel lateral.
+
 ## Conferência de segurança (obrigatória)
 
 - [ ] Nenhum item da Base de Conhecimento foi **criado, alterado, liberado ou excluído** pelo módulo.

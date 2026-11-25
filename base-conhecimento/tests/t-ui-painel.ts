@@ -76,6 +76,7 @@ const estado = {
   busca: "",
   itensPorPasta: {},
   recolhidas: new Set<string>(),
+  numerar: false,
 };
 
 function porTexto(raiz: DocumentFragment, seletor: string, texto: string): HTMLElement | undefined {
@@ -93,6 +94,17 @@ await teste("painel renderiza pastas aninhadas, contagens e Sem pasta", () => {
     [...raiz.querySelectorAll(".contagem")].some((c) => c.textContent === "1"),
   );
   checar("Sem pasta com item", raiz.querySelector(".item .rotulo")?.textContent === "PROCEDIMENTO A");
+});
+
+await teste("com numerar ligado o nome mostra a ordem e o estado nao muda", () => {
+  const { p, raiz } = painel();
+  const notas = { ...notinhas, pai: "p1" };
+  const arvore = [pasta("p1", "Fiscalizacao", [notas], 0)];
+  p.render({ ...estado, pastas: arvore, numerar: true });
+  const textos = [...raiz.querySelectorAll(".pasta")].map((b) => b.textContent ?? "");
+  checar("raiz numerada", textos[0]?.startsWith("1. Fiscalizacao") === true);
+  checar("filha numerada", textos[1]?.startsWith("1.1. Notas") === true);
+  checar("estado intacto", arvore[0]?.nome === "Fiscalizacao" && notas.nome === "Notas");
 });
 
 await teste("pasta selecionada tem aria-current e o botao nova pasta tem rotulo", () => {

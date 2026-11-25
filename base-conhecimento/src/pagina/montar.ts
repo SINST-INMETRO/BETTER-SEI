@@ -21,6 +21,7 @@ import { agrupadorDoTr } from "../nucleo/itens";
 import type { ItemBase } from "../nucleo/tipos";
 import { chaveStatus } from "../sincronia/envelope";
 import type { PayloadArrasto } from "../ui/arrasto";
+import type { AcaoAviso } from "../ui/aviso";
 import { garantirBotaoPastas, ID_BOTAO, type Modo } from "../ui/botao";
 import {
   atualizarCaption,
@@ -34,16 +35,20 @@ import {
 import { type AcoesPainel, montarPainel } from "../ui/painel";
 import { armazemNaTela } from "./armazem";
 import { consentimentoBase, type Perguntar, perguntarEntendi } from "./consentir";
+import { gravarIntencao, lerIntencao, limparIntencao, sinalDeCriacao } from "./novaEmContexto";
 import { ligarSincronia, type SincroniaBase } from "./sincronia";
 
-export function telaAtual(url = globalThis.location?.href ?? ""): "listar" | "pesquisar" | null {
+export function telaAtual(url = globalThis.location?.href ?? ""): "listar" | "pesquisar" | "cadastrar" | null {
   let acao: string | null = null;
   try {
     acao = new URL(url).searchParams.get("acao");
   } catch {
     return null;
   }
-  return acao === "base_conhecimento_listar" ? "listar" : acao === "base_conhecimento_pesquisar" ? "pesquisar" : null;
+  if (acao === "base_conhecimento_listar") return "listar";
+  if (acao === "base_conhecimento_pesquisar") return "pesquisar";
+  if (acao === "base_conhecimento_cadastrar") return "cadastrar";
+  return null;
 }
 
 /** Roda `fn` quando o DOM estiver pronto (o content script nasce em document_start). */
@@ -64,10 +69,12 @@ export interface DepsMontar {
   perguntar: Perguntar;
   pedirTexto: (rotulo: string, valorInicial?: string) => Promise<string | null>;
   confirmar: (texto: string) => Promise<boolean>;
-  escolherPasta: (pastas: PastaExibida[], atual: string | null) => Promise<{ pasta: string | null } | null>;
-  avisar: (texto: string) => void;
+  escolherPasta: (pastas: PastaExibida[], atual: string | null, numerar?: boolean) => Promise<{ pasta: string | null } | null>;
+  avisar: (texto: string, acao?: AcaoAviso) => void;
   idDispositivo: string;
   cssPainel: string;
+  /** Numeração de ordem na exibição (preferência por navegador); nunca vai ao Texto Padrão. */
+  numerar: boolean;
   janela: Pick<EventTarget, "addEventListener">;
   docEventos: Pick<EventTarget, "addEventListener"> & { readonly visibilityState: DocumentVisibilityState };
   agora?: () => number;
@@ -182,6 +189,18 @@ export async function montar(d: DepsMontar): Promise<() => void> {
 
   let vivo = true;
 
+  // "Nova em contexto": com uma pasta selecionada, o clique em Nova registra a
+  // intenção de uso único; o retorno do cadastro (sinal na URL) a consome.
+  const btnNova = doc.querySelector("#btnNova");
+  const aoClicarNova = (): void => {
+    // Na lista plana não há pasta visível selecionada: nada de contexto às cegas.
+    if (modo !== "arvore" || selecionada === null) return;
+    const caminho = caminhoDaPasta(exibicao.pastas, selecionada, d.numerar);
+    if (caminho === "") return; // a pasta selecionada não está mais na árvore viva
+    void gravarIntencao(d.area, d.ident, selecionada, caminho, agora());
+  };
+  btnNova?.addEventListener("click", aoClicarNova);
+
   async function lerStatus(): Promise<void> {
     status = ((await d.area.obter(chaveStatus))[chaveStatus] as StatusSync | undefined) ?? null;
   }
@@ -272,7 +291,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
 
   async function moverItem(agrupador: string): Promise<void> {
     const vinculo = ent.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
-    const escolha = await d.escolherPasta(exibicao.pastas, vinculo?.pasta ?? null);
+    const escolha = await d.escolherPasta(exibicao.pastas, vinculo?.pasta ?? null, d.numerar);
     if (!escolha) return;
     if (!(await garantirEscrita())) return;
     const item = itens.find((i) => i.agrupador === agrupador);
@@ -319,7 +338,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     const vinculo = ent.v.find((v) => v.id === payload.agrupador && v.removidoEm === undefined);
     const item = itens.find((i) => i.agrupador === payload.agrupador);
     const titulo = item?.titulo ?? vinculo?.titulo ?? "";
-    const caminho = destino === null ? "Sem pasta" : caminhoDaPasta(exibicao.pastas, destino) || "Sem pasta";
+    const caminho = destino === null ? "Sem pasta" : caminhoDaPasta(exibicao.pastas, destino, d.numerar) || "Sem pasta";
     if (!(await d.confirmar(`Mover "${titulo}" para "${caminho}"?`))) return;
     if (!(await garantirEscrita())) return;
     try {
@@ -341,7 +360,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
       return;
     }
     const nome = nomesDasPastas().get(id) ?? "pasta";
-    const caminho = destino === null ? "a raiz" : caminhoDaPasta(exibicao.pastas, destino) || "a raiz";
+    const caminho = destino === null ? "a raiz" : caminhoDaPasta(exibicao.pastas, destino, d.numerar) || "a raiz";
     if (!(await d.confirmar(`Você está movendo a PASTA "${nome}" (com subpastas e itens) para "${caminho}". Confirmar?`))) return;
     if (!(await garantirEscrita())) return;
     try {
@@ -354,7 +373,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   }
 
   async function moverPastaPorMenu(id: string): Promise<void> {
-    const escolha = await d.escolherPasta(exibicao.pastas, paiDaPasta(id));
+    const escolha = await d.escolherPasta(exibicao.pastas, paiDaPasta(id), d.numerar);
     if (!escolha) return;
     await moverPastaPara(id, escolha.pasta);
   }
@@ -424,7 +443,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   function rotuloDe(agrupador: string): string {
     const vinculo = ent.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
     if (!vinculo || vinculo.pasta === null) return "Sem pasta";
-    return caminhoDaPasta(exibicao.pastas, vinculo.pasta) || "Sem pasta";
+    return caminhoDaPasta(exibicao.pastas, vinculo.pasta, d.numerar) || "Sem pasta";
   }
 
   function aplicarFiltro(): void {
@@ -452,14 +471,119 @@ export async function montar(d: DepsMontar): Promise<() => void> {
       aviso: somenteLeitura() ? (status?.mensagem ?? AVISO_SO_LEITURA) : undefined,
       itensPorPasta: itensPorPasta(),
       recolhidas,
+      numerar: d.numerar,
     });
     aplicarFiltro();
   }
 
+  async function aplicarIntencao(): Promise<void> {
+    const sinal = sinalDeCriacao(d.url);
+    const intencao = await lerIntencao(d.area, d.ident, agora());
+    if (!sinal) {
+      // Lista comum (cancelou ou voltou sem criar): a intenção não vale mais.
+      if (intencao) await limparIntencao(d.area);
+      return;
+    }
+    if (!intencao) return;
+
+    const item = itens.find((i) => i.id === sinal.id);
+    if (!item) {
+      await limparIntencao(d.area);
+      d.avisar("O documento criado não foi localizado na lista; organize-o manualmente.");
+      return;
+    }
+
+    const agrupador = item.agrupador;
+    const vivo = ent.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
+    if (vivo && vivo.pasta !== null) {
+      // Já organizado (por um colega ou por outra aba): não sobrescreve.
+      await limparIntencao(d.area);
+      return;
+    }
+
+    if (!nomesDasPastas().has(intencao.pastaId)) {
+      await limparIntencao(d.area);
+      d.avisar("A pasta escolhida não existe mais; o documento ficou em Sem pasta.");
+      return;
+    }
+
+    const mover = async (): Promise<void> => {
+      // Relê antes de gravar: o aviso com ação pode ter esperado um colega
+      // organizar o item nesse meio-tempo (regra 6).
+      const atual = await repo.listar();
+      const existente = atual.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
+      if (existente && existente.pasta !== null) {
+        await limparIntencao(d.area);
+        return;
+      }
+      await repo.moverVinculo(agrupador, intencao.pastaId, item.titulo);
+      const criado = (await repo.listar()).v.find((v) => v.id === agrupador && v.removidoEm === undefined);
+      const carimbo = criado ? { atualizadoEm: criado.atualizadoEm, dispositivo: criado.dispositivo } : null;
+      await limparIntencao(d.area);
+      recolhidas.delete(intencao.pastaId);
+      await refrescar();
+      d.avisar(`Documento criado em "${intencao.caminho}".`, {
+        rotulo: "Desfazer",
+        fazer: () => {
+          void (async () => {
+            const agoraEnt = await repo.listar();
+            const atualLink = agoraEnt.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
+            const aindaNosso =
+              atualLink !== undefined &&
+              atualLink.pasta === intencao.pastaId &&
+              carimbo !== null &&
+              atualLink.atualizadoEm === carimbo.atualizadoEm &&
+              atualLink.dispositivo === carimbo.dispositivo;
+            if (!aindaNosso) {
+              d.avisar("A organização deste documento mudou; nada foi desfeito.");
+              return;
+            }
+            await repo.removerVinculo(agrupador);
+            await refrescar();
+          })().catch((e) => d.avisar(e instanceof Error ? e.message : String(e)));
+        },
+      });
+    };
+
+    if (somenteLeitura()) {
+      await limparIntencao(d.area);
+      d.avisar("Documento criado em Sem pasta.");
+      return;
+    }
+
+    const porta = consentimentoBase(d.sync, d.ident.host, d.contexto.login, d.contexto.unidade.id);
+    if ((await porta.estado()) !== "ligado") {
+      d.avisar(`Documento criado em Sem pasta. Aceite o "Entendi" para organizá-lo em "${intencao.caminho}".`, {
+        rotulo: "Entendi e organizar",
+        fazer: () => {
+          void (async () => {
+            const aceitou = await perguntarEntendi(d.perguntar, d.contexto.unidade.sigla);
+            if (!aceitou) {
+              await limparIntencao(d.area);
+              return;
+            }
+            await porta.definir("ligado");
+            await mover();
+          })().catch((e) => d.avisar(e instanceof Error ? e.message : String(e)));
+        },
+      });
+      return;
+    }
+
+    try {
+      await mover();
+    } catch (e) {
+      d.avisar(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   render();
+  // A intenção é acessório: falha de storage não derruba a tela já montada.
+  await aplicarIntencao().catch((e) => console.warn("[SEI Pro] base-conhecimento: intencao:", e));
 
   return () => {
     vivo = false;
+    btnNova?.removeEventListener("click", aoClicarNova);
     desligarMudancas();
     desligarStatus();
     desligarSort();

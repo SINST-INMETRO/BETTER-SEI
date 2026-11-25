@@ -99,6 +99,20 @@ await teste("escolherPasta lista caminhos e devolve a pasta escolhida", async ()
   checar("escolheu p1", JSON.stringify(await p) === JSON.stringify({ pasta: "p1" }));
 });
 
+await teste("escolherPasta com numerar mostra os caminhos numerados", async () => {
+  const { doc, d } = montar();
+  const pastas = [pasta("p1", "Fiscalizacao", null, [pasta("p2", "Notas", "p1")])];
+  const p = d.escolherPasta(pastas, "p2", true);
+  const s = sombraDe(doc);
+  const select = s.querySelector("select") as HTMLSelectElement;
+  const textos = [...select.options].map((o) => (o.textContent ?? "").trim());
+  checar("raiz numerada", textos[1] === "1. Fiscalizacao");
+  checar("subpasta numerada", textos[2] === "1. Fiscalizacao › 1.1. Notas");
+  const cancelar = [...s.querySelectorAll("button")].find((b) => b.textContent === "Cancelar") as HTMLElement;
+  cancelar.click();
+  checar("cancelou", (await p) === null);
+});
+
 await teste("perguntar usa os rotulos pedidos", async () => {
   const { doc, d } = montar();
   const p = d.perguntar("Aceita?", "Entendi", "Agora não");
