@@ -4,8 +4,13 @@ import { disparar } from "../../sei-comum/tests/util";
 import { itensDaPagina } from "../src/nucleo/itens";
 import { consentimentoBase } from "../src/pagina/consentir";
 import { type DepsMontar, montar, quandoDomPronto, telaAtual } from "../src/pagina/montar";
+import { CHAVE_INTENCAO, gravarIntencao } from "../src/pagina/novaEmContexto";
 import { MIME_ARRASTO, type PayloadArrasto, serializarArrasto } from "../src/ui/arrasto";
+import type { AcaoAviso } from "../src/ui/aviso";
 import { checar, docFixture, paginaFixture, teste } from "./util";
+
+const URL_RETORNO =
+  "https://sei.exemplo.gov.br/sei/controlador.php?acao=base_conhecimento_listar&acao_origem=base_conhecimento_cadastrar&id_base_conhecimento=42&resultado=1";
 
 const IDENT = { host: "sei.exemplo.gov.br", unidade: "110000108" };
 const URL_LISTAR = "https://sei.exemplo.gov.br/sei/controlador.php?acao=base_conhecimento_listar";
@@ -461,4 +466,167 @@ await teste("numerar ligado chega ao painel e ao dialogo, sem gravar numeros", a
   await esperar();
   checar("dialogo recebeu numerar", numerarRecebido[0] === true);
   desfazer();
+});
+
+const PASTA_P1 = { id: "p1", nome: "Fiscalizacao", pai: null, ordem: "a0", atualizadoEm: 1, dispositivo: "d1" };
+/** Na fixture, a versão 42 pertence ao agrupador estável 40 (o vínculo vive pelo agrupador). */
+const AGRUPADOR_42 = "40";
+
+function capturarAvisos(): { avisos: Array<{ texto: string; acao?: AcaoAviso }>; avisar: (t: string, a?: AcaoAviso) => void } {
+  const avisos: Array<{ texto: string; acao?: AcaoAviso }> = [];
+  return { avisos, avisar: (texto, acao) => avisos.push({ texto, acao }) };
+}
+
+const vinculoDaArea = async (d: DepsMontar, agrupador: string): Promise<{ pasta?: string; removidoEm?: number } | undefined> => {
+  const chave = `base-conhecimento/vinculos/${agrupador}`;
+  return (await d.area.obter(chave))[chave] as { pasta?: string; removidoEm?: number } | undefined;
+};
+
+await teste("retorno da criacao organiza o item na pasta da intencao", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const d = deps({ url: URL_RETORNO, avisar });
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  await consentimentoBase(d.sync, IDENT.host, "usuario.teste", IDENT.unidade).definir("ligado");
+  await gravarIntencao(d.area, IDENT, "p1", "1. Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  checar("vinculo na pasta", (await vinculoDaArea(d, AGRUPADOR_42))?.pasta === "p1");
+  checar(
+    "aviso de sucesso com desfazer",
+    avisos.some((a) => a.texto === 'Documento criado em "1. Fiscalizacao".' && a.acao?.rotulo === "Desfazer"),
+  );
+  checar("intencao limpa", !(CHAVE_INTENCAO in (await d.area.obter(CHAVE_INTENCAO))));
+  desfazer();
+});
+
+await teste("desfazer devolve o item a Sem pasta", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const d = deps({ url: URL_RETORNO, avisar });
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  await consentimentoBase(d.sync, IDENT.host, "usuario.teste", IDENT.unidade).definir("ligado");
+  await gravarIntencao(d.area, IDENT, "p1", "Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  const acao = avisos.find((a) => a.acao?.rotulo === "Desfazer")?.acao;
+  checar("tem desfazer", acao !== undefined);
+  acao?.fazer();
+  await esperar();
+  checar("lapide no vinculo", (await vinculoDaArea(d, AGRUPADOR_42))?.removidoEm !== undefined);
+  desfazer();
+});
+
+await teste("retorno com id fora da lista avisa e limpa a intencao", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const d = deps({ url: URL_RETORNO.replace("id_base_conhecimento=42", "id_base_conhecimento=99"), avisar });
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  await gravarIntencao(d.area, IDENT, "p1", "Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  checar(
+    "aviso",
+    avisos.some((a) => a.texto === "O documento criado não foi localizado na lista; organize-o manualmente."),
+  );
+  checar("intencao limpa", !(CHAVE_INTENCAO in (await d.area.obter(CHAVE_INTENCAO))));
+  checar("nada gravado", (await vinculoDaArea(d, AGRUPADOR_42)) === undefined);
+  desfazer();
+});
+
+await teste("item ja organizado por colega nao e sobrescrito", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const d = deps({ url: URL_RETORNO, avisar });
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": PASTA_P1,
+    "base-conhecimento/pastas/p2": { id: "p2", nome: "Colega", pai: null, ordem: "a1", atualizadoEm: 1, dispositivo: "d1" },
+    "base-conhecimento/vinculos/40": {
+      id: "40",
+      titulo: "PROCEDIMENTO DE EXEMPLO A",
+      pasta: "p2",
+      ordem: "a0",
+      atualizadoEm: 1,
+      dispositivo: "d1",
+    },
+  });
+  await gravarIntencao(d.area, IDENT, "p1", "Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  checar("continua em p2", (await vinculoDaArea(d, AGRUPADOR_42))?.pasta === "p2");
+  checar("intencao limpa", !(CHAVE_INTENCAO in (await d.area.obter(CHAVE_INTENCAO))));
+  checar("sem aviso", avisos.length === 0);
+  desfazer();
+});
+
+await teste("sem consentimento oferece Entendi e organizar (aceitar associa)", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const d = deps({ url: URL_RETORNO, avisar });
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  await gravarIntencao(d.area, IDENT, "p1", "Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  const acao = avisos.find((a) => a.acao?.rotulo === "Entendi e organizar")?.acao;
+  checar("aviso com a acao", acao !== undefined);
+  checar("nada gravado antes de aceitar", (await vinculoDaArea(d, AGRUPADOR_42)) === undefined);
+  acao?.fazer();
+  await esperar();
+  checar("associou depois do Entendi", (await vinculoDaArea(d, AGRUPADOR_42))?.pasta === "p1");
+  checar("intencao limpa", !(CHAVE_INTENCAO in (await d.area.obter(CHAVE_INTENCAO))));
+  desfazer();
+});
+
+await teste("sem consentimento: recusar o Entendi nao associa e limpa a intencao", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const d = deps({ url: URL_RETORNO, avisar, perguntar: async () => false });
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  await gravarIntencao(d.area, IDENT, "p1", "Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  const acao = avisos.find((a) => a.acao?.rotulo === "Entendi e organizar")?.acao;
+  checar("aviso com a acao", acao !== undefined);
+  acao?.fazer();
+  await esperar();
+  checar("nada gravado", (await vinculoDaArea(d, AGRUPADOR_42)) === undefined);
+  checar("intencao limpa", !(CHAVE_INTENCAO in (await d.area.obter(CHAVE_INTENCAO))));
+  desfazer();
+});
+
+await teste("pasta da intencao removida: avisa e nao grava", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const d = deps({ url: URL_RETORNO, avisar });
+  await d.area.gravar({ "base-conhecimento/pastas/p2": { ...PASTA_P1, id: "p2", nome: "Outra" } });
+  await consentimentoBase(d.sync, IDENT.host, "usuario.teste", IDENT.unidade).definir("ligado");
+  await gravarIntencao(d.area, IDENT, "p1", "Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  checar(
+    "aviso",
+    avisos.some((a) => a.texto === "A pasta escolhida não existe mais; o documento ficou em Sem pasta."),
+  );
+  checar("nada gravado", (await vinculoDaArea(d, AGRUPADOR_42)) === undefined);
+  desfazer();
+});
+
+await teste("lista comum limpa a intencao sem aviso", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const d = deps({ avisar });
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  await gravarIntencao(d.area, IDENT, "p1", "Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  checar("intencao limpa", !(CHAVE_INTENCAO in (await d.area.obter(CHAVE_INTENCAO))));
+  checar("sem aviso", avisos.length === 0);
+  desfazer();
+});
+
+await teste("Nova com pasta selecionada grava a intencao e a volta usa o caminho numerado", async () => {
+  const d = deps({ numerar: true });
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  const desfazer = await montar(d);
+  disparar(d.doc.querySelector("#btnNova") as Element, "click");
+  await esperar();
+  const bruto = (await d.area.obter(CHAVE_INTENCAO))[CHAVE_INTENCAO] as { pastaId?: string; caminho?: string } | undefined;
+  checar("pasta da intencao", bruto?.pastaId === "p1");
+  checar("caminho numerado no clique", bruto?.caminho === "1. Fiscalizacao");
+  desfazer();
+
+  const { avisos, avisar } = capturarAvisos();
+  await consentimentoBase(d.sync, IDENT.host, "usuario.teste", IDENT.unidade).definir("ligado");
+  const d2 = deps({ url: URL_RETORNO, area: d.area, sync: d.sync, numerar: true, avisar });
+  const desfazer2 = await montar(d2);
+  checar("vinculo na pasta", (await vinculoDaArea(d2, AGRUPADOR_42))?.pasta === "p1");
+  checar(
+    "aviso com o caminho numerado",
+    avisos.some((a) => a.texto === 'Documento criado em "1. Fiscalizacao".'),
+  );
+  desfazer2();
 });

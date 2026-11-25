@@ -35,6 +35,7 @@ import {
 import { type AcoesPainel, montarPainel } from "../ui/painel";
 import { armazemNaTela } from "./armazem";
 import { consentimentoBase, type Perguntar, perguntarEntendi } from "./consentir";
+import { gravarIntencao, lerIntencao, limparIntencao, sinalDeCriacao } from "./novaEmContexto";
 import { ligarSincronia, type SincroniaBase } from "./sincronia";
 
 export function telaAtual(url = globalThis.location?.href ?? ""): "listar" | "pesquisar" | null {
@@ -184,6 +185,17 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   const desligarSort = ligarAoSortDaTabela(doc, () => aplicarFiltro());
 
   let vivo = true;
+
+  // "Nova em contexto": com uma pasta selecionada, o clique em Nova registra a
+  // intenção de uso único; o retorno do cadastro (sinal na URL) a consome.
+  const btnNova = doc.querySelector("#btnNova");
+  const aoClicarNova = (): void => {
+    if (selecionada === null) return;
+    const caminho = caminhoDaPasta(exibicao.pastas, selecionada, d.numerar);
+    if (caminho === "") return; // a pasta selecionada não está mais na árvore viva
+    void gravarIntencao(d.area, d.ident, selecionada, caminho, agora());
+  };
+  btnNova?.addEventListener("click", aoClicarNova);
 
   async function lerStatus(): Promise<void> {
     status = ((await d.area.obter(chaveStatus))[chaveStatus] as StatusSync | undefined) ?? null;
@@ -460,10 +472,91 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     aplicarFiltro();
   }
 
+  async function aplicarIntencao(): Promise<void> {
+    const sinal = sinalDeCriacao(d.url);
+    const intencao = await lerIntencao(d.area, d.ident, agora());
+    if (!sinal) {
+      // Lista comum (cancelou ou voltou sem criar): a intenção não vale mais.
+      if (intencao) await limparIntencao(d.area);
+      return;
+    }
+    if (!intencao) return;
+
+    const item = itens.find((i) => i.id === sinal.id);
+    if (!item) {
+      await limparIntencao(d.area);
+      d.avisar("O documento criado não foi localizado na lista; organize-o manualmente.");
+      return;
+    }
+
+    const agrupador = item.agrupador;
+    const vivo = ent.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
+    if (vivo && vivo.pasta !== null) {
+      // Já organizado (por um colega ou por outra aba): não sobrescreve.
+      await limparIntencao(d.area);
+      return;
+    }
+
+    if (!nomesDasPastas().has(intencao.pastaId)) {
+      await limparIntencao(d.area);
+      d.avisar("A pasta escolhida não existe mais; o documento ficou em Sem pasta.");
+      return;
+    }
+
+    const mover = async (): Promise<void> => {
+      await repo.moverVinculo(agrupador, intencao.pastaId, item.titulo);
+      await limparIntencao(d.area);
+      recolhidas.delete(intencao.pastaId);
+      await refrescar();
+      d.avisar(`Documento criado em "${intencao.caminho}".`, {
+        rotulo: "Desfazer",
+        fazer: () => {
+          void repo
+            .removerVinculo(agrupador)
+            .then(() => refrescar())
+            .catch((e) => d.avisar(e instanceof Error ? e.message : String(e)));
+        },
+      });
+    };
+
+    if (somenteLeitura()) {
+      await limparIntencao(d.area);
+      d.avisar("Documento criado em Sem pasta.");
+      return;
+    }
+
+    const porta = consentimentoBase(d.sync, d.ident.host, d.contexto.login, d.contexto.unidade.id);
+    if ((await porta.estado()) !== "ligado") {
+      d.avisar(`Documento criado em Sem pasta. Aceite o "Entendi" para organizá-lo em "${intencao.caminho}".`, {
+        rotulo: "Entendi e organizar",
+        fazer: () => {
+          void (async () => {
+            const aceitou = await perguntarEntendi(d.perguntar, d.contexto.unidade.sigla);
+            if (!aceitou) {
+              await limparIntencao(d.area);
+              return;
+            }
+            await porta.definir("ligado");
+            await mover().catch((e) => d.avisar(e instanceof Error ? e.message : String(e)));
+          })();
+        },
+      });
+      return;
+    }
+
+    try {
+      await mover();
+    } catch (e) {
+      d.avisar(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   render();
+  await aplicarIntencao();
 
   return () => {
     vivo = false;
+    btnNova?.removeEventListener("click", aoClicarNova);
     desligarMudancas();
     desligarStatus();
     desligarSort();
