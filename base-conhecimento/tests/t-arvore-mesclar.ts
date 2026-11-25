@@ -94,3 +94,14 @@ await teste("caminhoDaPasta monta o caminho com a hierarquia", () => {
   checar("caminho da raiz", caminhoDaPasta(e.pastas, "p2") === "Pareceres");
   checar("inexistente", caminhoDaPasta(e.pastas, "xx") === "");
 });
+
+await teste("caminhoDaPasta numerado prefixa cada segmento sem mudar a arvore", () => {
+  const e = montarExibicao(
+    ent([pasta("p1", "Fiscalizacao", null, "a0"), pasta("p2", "Pareceres", null, "a1"), pasta("p3", "Notas", "p1", "a0")], []),
+    [],
+  );
+  checar("numerado", caminhoDaPasta(e.pastas, "p3", true) === "1. Fiscalizacao › 1.1. Notas");
+  checar("sem numerar igual ao de antes", caminhoDaPasta(e.pastas, "p3") === "Fiscalizacao › Notas");
+  checar("nome da raiz intacto", e.pastas[0]?.nome === "Fiscalizacao");
+  checar("nome da filha intacto", e.pastas[0]?.filhas[0]?.nome === "Notas");
+});

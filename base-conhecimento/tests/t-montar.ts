@@ -45,6 +45,7 @@ function deps(over: Partial<DepsMontar> = {}): DepsMontar {
     avisar: () => {},
     idDispositivo: "d1",
     cssPainel: "",
+    numerar: false,
     janela: new EventTarget(),
     docEventos: Object.assign(new EventTarget(), { visibilityState: "visible" as DocumentVisibilityState }),
     agora: () => 100,
@@ -423,5 +424,41 @@ await teste("menu Mover para da pasta move com confirmacao de pasta", async () =
   );
   const p2 = (await d.area.obter("base-conhecimento/pastas/p2"))["base-conhecimento/pastas/p2"] as { pai: string | null } | undefined;
   checar("moveu via menu", p2?.pai === "p1");
+  desfazer();
+});
+
+await teste("numerar ligado chega ao painel e ao dialogo, sem gravar numeros", async () => {
+  const numerarRecebido: Array<boolean | undefined> = [];
+  const d = deps({
+    numerar: true,
+    escolherPasta: async (_pastas, _atual, numerar) => {
+      numerarRecebido.push(numerar);
+      return null;
+    },
+  });
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": { id: "p1", nome: "Fiscalizacao", pai: null, ordem: "a0", atualizadoEm: 1, dispositivo: "d1" },
+    "base-conhecimento/pastas/p2": { id: "p2", nome: "Talentos", pai: null, ordem: "a1", atualizadoEm: 2, dispositivo: "d1" },
+  });
+  const desfazer = await montar(d);
+  const s = sombra(d.doc);
+  const textos = [...s.querySelectorAll(".pasta")].map((b) => b.textContent ?? "");
+  checar(
+    "primeira raiz numerada",
+    textos.some((t) => t.startsWith("1. Fiscalizacao")),
+  );
+  checar(
+    "segunda raiz numerada",
+    textos.some((t) => t.startsWith("2. Talentos")),
+  );
+  const gravada = (await d.area.obter("base-conhecimento/pastas/p1"))["base-conhecimento/pastas/p1"] as { nome?: string } | undefined;
+  checar("dado gravado sem numero", gravada?.nome === "Fiscalizacao");
+  const raiz = [...s.querySelectorAll(".pasta")].find((b) => b.textContent?.startsWith("1. Fiscalizacao")) as HTMLElement;
+  const li = raiz.closest("li") as HTMLElement;
+  (li.querySelector('[aria-label="Ações da pasta"]') as HTMLElement).click();
+  const mover = [...li.querySelectorAll(".acoes button")].find((b) => b.textContent === "Mover para…") as HTMLElement;
+  mover.click();
+  await esperar();
+  checar("dialogo recebeu numerar", numerarRecebido[0] === true);
   desfazer();
 });

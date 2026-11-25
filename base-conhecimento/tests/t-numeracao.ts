@@ -1,7 +1,9 @@
+import { areaMemoria } from "@comum/armazenamento/area";
 import type { PastaExibida } from "../src/arvore/mesclar";
 import { montarExibicao } from "../src/arvore/mesclar";
 import type { EntidadesArvore, Pasta } from "../src/arvore/modelo";
 import { nomeNumerado, numeroDaPasta } from "../src/arvore/numeracao";
+import { CHAVE_NUMERAR, lerNumeracao } from "../src/preferencias";
 import { checar, teste } from "./util";
 
 const CARIMBO = { atualizadoEm: 1, dispositivo: "d1" };
@@ -46,4 +48,11 @@ await teste("ciclo de pais nao trava e nao numera", () => {
 await teste("nomeNumerado poe o numero a frente so quando existe", () => {
   checar("sem numero", nomeNumerado("Fiscalização", "") === "Fiscalização");
   checar("com numero", nomeNumerado("Fiscalização", "1.2") === "1.2. Fiscalização");
+});
+
+await teste("lerNumeracao so liga com o valor sim", async () => {
+  checar("ausente e desligada", (await lerNumeracao(areaMemoria())) === false);
+  checar("sim liga", (await lerNumeracao(areaMemoria({ [CHAVE_NUMERAR]: "sim" }))) === true);
+  checar("nao desliga", (await lerNumeracao(areaMemoria({ [CHAVE_NUMERAR]: "nao" }))) === false);
+  checar("valor estranho desliga", (await lerNumeracao(areaMemoria({ [CHAVE_NUMERAR]: "abc" }))) === false);
 });

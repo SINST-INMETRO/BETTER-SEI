@@ -13,7 +13,7 @@ export interface Dialogos {
   pedirTexto(rotulo: string, valorInicial?: string): Promise<string | null>;
   confirmar(texto: string): Promise<boolean>;
   perguntar(texto: string, rotuloOk: string, rotuloNao: string): Promise<boolean>;
-  escolherPasta(pastas: PastaExibida[], atual: string | null): Promise<{ pasta: string | null } | null>;
+  escolherPasta(pastas: PastaExibida[], atual: string | null, numerar?: boolean): Promise<{ pasta: string | null } | null>;
   destruir(): void;
 }
 
@@ -220,7 +220,7 @@ export function criarDialogos(o: { doc?: Document; css?: string } = {}): Dialogo
       );
     },
 
-    escolherPasta(pastas, atual) {
+    escolherPasta(pastas, atual, numerar = false) {
       const label = doc.createElement("label");
       const id = `spro-bc-pasta-${++numero}`;
       label.htmlFor = id;
@@ -233,7 +233,7 @@ export function criarDialogos(o: { doc?: Document; css?: string } = {}): Dialogo
       const opcoes: Array<{ valor: string; texto: string; atual: boolean }> = [{ valor: "", texto: "Sem pasta", atual: atual === null }];
       const indexar = (lista: PastaExibida[]): void => {
         for (const p of lista) {
-          opcoes.push({ valor: p.id, texto: caminhoDaPasta(pastas, p.id), atual: p.id === atual });
+          opcoes.push({ valor: p.id, texto: caminhoDaPasta(pastas, p.id, numerar), atual: p.id === atual });
           indexar(p.filhas);
         }
       };

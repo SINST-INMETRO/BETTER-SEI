@@ -10,6 +10,7 @@
 import { icone } from "@comum/ui/dom";
 import type { PastaExibida } from "../arvore/mesclar";
 import type { Vinculo } from "../arvore/modelo";
+import { nomeNumerado, numeroDaPasta } from "../arvore/numeracao";
 import type { ItemBase } from "../nucleo/tipos";
 import { lerArrasto, MIME_ARRASTO, type PayloadArrasto, serializarArrasto } from "./arrasto";
 
@@ -25,6 +26,8 @@ export interface EstadoPainel {
   itensPorPasta: Readonly<Record<string, ItemBase[]>>;
   /** Pastas recolhidas (chevron fechado). */
   recolhidas: ReadonlySet<string>;
+  /** Mostra o número de ordem antes do nome (preferência por navegador). */
+  numerar: boolean;
 }
 
 export interface AcoesPainel {
@@ -106,7 +109,8 @@ export function montarPainel(
     selecionada: null,
     busca: "",
     itensPorPasta: {},
-    recolhidas: new Set(),
+    recolhidas: new Set<string>(),
+    numerar: false,
   };
 
   const el = (tag: string, classe?: string): HTMLElement => {
@@ -214,7 +218,7 @@ export function montarPainel(
     const ic = icone("pasta", 18, doc);
     ic.setAttribute("aria-hidden", "true");
     const nome = el("span");
-    nome.textContent = p.nome;
+    nome.textContent = atual.numerar ? nomeNumerado(p.nome, numeroDaPasta(atual.pastas, p.id)) : p.nome;
     const cont = el("span", "contagem");
     cont.textContent = String(p.contagem);
     botao.append(ic, nome, cont);

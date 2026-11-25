@@ -64,10 +64,12 @@ export interface DepsMontar {
   perguntar: Perguntar;
   pedirTexto: (rotulo: string, valorInicial?: string) => Promise<string | null>;
   confirmar: (texto: string) => Promise<boolean>;
-  escolherPasta: (pastas: PastaExibida[], atual: string | null) => Promise<{ pasta: string | null } | null>;
+  escolherPasta: (pastas: PastaExibida[], atual: string | null, numerar?: boolean) => Promise<{ pasta: string | null } | null>;
   avisar: (texto: string) => void;
   idDispositivo: string;
   cssPainel: string;
+  /** Numeração de ordem na exibição (preferência por navegador); nunca vai ao Texto Padrão. */
+  numerar: boolean;
   janela: Pick<EventTarget, "addEventListener">;
   docEventos: Pick<EventTarget, "addEventListener"> & { readonly visibilityState: DocumentVisibilityState };
   agora?: () => number;
@@ -272,7 +274,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
 
   async function moverItem(agrupador: string): Promise<void> {
     const vinculo = ent.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
-    const escolha = await d.escolherPasta(exibicao.pastas, vinculo?.pasta ?? null);
+    const escolha = await d.escolherPasta(exibicao.pastas, vinculo?.pasta ?? null, d.numerar);
     if (!escolha) return;
     if (!(await garantirEscrita())) return;
     const item = itens.find((i) => i.agrupador === agrupador);
@@ -319,7 +321,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     const vinculo = ent.v.find((v) => v.id === payload.agrupador && v.removidoEm === undefined);
     const item = itens.find((i) => i.agrupador === payload.agrupador);
     const titulo = item?.titulo ?? vinculo?.titulo ?? "";
-    const caminho = destino === null ? "Sem pasta" : caminhoDaPasta(exibicao.pastas, destino) || "Sem pasta";
+    const caminho = destino === null ? "Sem pasta" : caminhoDaPasta(exibicao.pastas, destino, d.numerar) || "Sem pasta";
     if (!(await d.confirmar(`Mover "${titulo}" para "${caminho}"?`))) return;
     if (!(await garantirEscrita())) return;
     try {
@@ -341,7 +343,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
       return;
     }
     const nome = nomesDasPastas().get(id) ?? "pasta";
-    const caminho = destino === null ? "a raiz" : caminhoDaPasta(exibicao.pastas, destino) || "a raiz";
+    const caminho = destino === null ? "a raiz" : caminhoDaPasta(exibicao.pastas, destino, d.numerar) || "a raiz";
     if (!(await d.confirmar(`Você está movendo a PASTA "${nome}" (com subpastas e itens) para "${caminho}". Confirmar?`))) return;
     if (!(await garantirEscrita())) return;
     try {
@@ -354,7 +356,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   }
 
   async function moverPastaPorMenu(id: string): Promise<void> {
-    const escolha = await d.escolherPasta(exibicao.pastas, paiDaPasta(id));
+    const escolha = await d.escolherPasta(exibicao.pastas, paiDaPasta(id), d.numerar);
     if (!escolha) return;
     await moverPastaPara(id, escolha.pasta);
   }
@@ -424,7 +426,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   function rotuloDe(agrupador: string): string {
     const vinculo = ent.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
     if (!vinculo || vinculo.pasta === null) return "Sem pasta";
-    return caminhoDaPasta(exibicao.pastas, vinculo.pasta) || "Sem pasta";
+    return caminhoDaPasta(exibicao.pastas, vinculo.pasta, d.numerar) || "Sem pasta";
   }
 
   function aplicarFiltro(): void {
@@ -452,6 +454,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
       aviso: somenteLeitura() ? (status?.mensagem ?? AVISO_SO_LEITURA) : undefined,
       itensPorPasta: itensPorPasta(),
       recolhidas,
+      numerar: d.numerar,
     });
     aplicarFiltro();
   }

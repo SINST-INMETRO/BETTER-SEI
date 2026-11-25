@@ -9,6 +9,7 @@
 
 import type { ItemBase } from "../nucleo/tipos";
 import type { EntidadesArvore, Vinculo } from "./modelo";
+import { nomeNumerado, numeroDaPasta } from "./numeracao";
 
 export interface PastaExibida {
   id: string;
@@ -82,8 +83,8 @@ export function vinculosDesatualizados(ent: EntidadesArvore, itens: ItemBase[]):
   return ent.v.filter((v) => v.removidoEm === undefined && porAgrupador.has(v.id) && porAgrupador.get(v.id) !== v.titulo);
 }
 
-/** "Fiscalizacao › Notas Tecnicas" (raízes até a pasta); "" se a pasta não está na árvore. */
-export function caminhoDaPasta(pastas: PastaExibida[], id: string): string {
+/** "Fiscalizacao › Notas Tecnicas" (raízes até a pasta); "" se a pasta não está na árvore. Com `numerar`, cada segmento ganha o número de ordem ("1. Fiscalizacao › 1.1. Notas Tecnicas"). */
+export function caminhoDaPasta(pastas: PastaExibida[], id: string, numerar = false): string {
   const mapa = new Map<string, PastaExibida>();
   const indexar = (lista: PastaExibida[]): void => {
     for (const p of lista) {
@@ -99,7 +100,7 @@ export function caminhoDaPasta(pastas: PastaExibida[], id: string): string {
   const vistos = new Set<string>();
   while (atual && !vistos.has(atual.id)) {
     vistos.add(atual.id);
-    nomes.unshift(atual.nome);
+    nomes.unshift(numerar ? nomeNumerado(atual.nome, numeroDaPasta(pastas, atual.id)) : atual.nome);
     atual = atual.pai !== null ? mapa.get(atual.pai) : undefined;
   }
   return nomes.join(" › ");
