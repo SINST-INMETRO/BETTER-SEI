@@ -48,3 +48,21 @@
   outline: 2px solid #fff;
   outline-offset: 1px;
 }
+.aviso .botao-acao {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: #fff;
+  color: #155f9b;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.aviso .botao-acao:hover {
+  background: #e7f0f8;
+}
+.aviso .botao-acao:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}

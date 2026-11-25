@@ -6,8 +6,13 @@
  * contraste AA com o azul de cabeçalho do SEI (`#155f9b`).
  */
 
+export interface AcaoAviso {
+  rotulo: string;
+  fazer(): void;
+}
+
 export interface Avisos {
-  avisar(texto: string): void;
+  avisar(texto: string, acao?: AcaoAviso): void;
   destruir(): void;
 }
 
@@ -37,7 +42,7 @@ export function criarAvisos(o: { doc?: Document; css?: string; duracaoMs?: numbe
   };
 
   return {
-    avisar(texto) {
+    avisar(texto, acao) {
       const aviso = doc.createElement("div");
       aviso.className = "aviso";
       aviso.setAttribute("role", "status");
@@ -51,12 +56,28 @@ export function criarAvisos(o: { doc?: Document; css?: string; duracaoMs?: numbe
       fechar.setAttribute("aria-label", "Fechar aviso");
       fechar.textContent = "×";
       fechar.addEventListener("click", () => remover(aviso));
-      aviso.append(span, fechar);
+      aviso.append(span);
+      if (acao) {
+        const botao = doc.createElement("button");
+        botao.type = "button";
+        botao.className = "botao-acao";
+        botao.setAttribute("aria-label", acao.rotulo);
+        botao.textContent = acao.rotulo;
+        botao.addEventListener("click", () => {
+          remover(aviso);
+          acao.fazer();
+        });
+        aviso.append(botao);
+      }
+      aviso.append(fechar);
       lista.appendChild(aviso);
-      timers.set(
-        aviso,
-        setTimeout(() => remover(aviso), duracao),
-      );
+      // Com ação, o aviso espera a pessoa: só sai ao agir ou fechar.
+      if (!acao) {
+        timers.set(
+          aviso,
+          setTimeout(() => remover(aviso), duracao),
+        );
+      }
     },
     destruir() {
       for (const t of timers.values()) clearTimeout(t);

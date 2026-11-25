@@ -21,6 +21,7 @@ import { agrupadorDoTr } from "../nucleo/itens";
 import type { ItemBase } from "../nucleo/tipos";
 import { chaveStatus } from "../sincronia/envelope";
 import type { PayloadArrasto } from "../ui/arrasto";
+import type { AcaoAviso } from "../ui/aviso";
 import { garantirBotaoPastas, ID_BOTAO, type Modo } from "../ui/botao";
 import {
   atualizarCaption,
@@ -65,7 +66,7 @@ export interface DepsMontar {
   pedirTexto: (rotulo: string, valorInicial?: string) => Promise<string | null>;
   confirmar: (texto: string) => Promise<boolean>;
   escolherPasta: (pastas: PastaExibida[], atual: string | null, numerar?: boolean) => Promise<{ pasta: string | null } | null>;
-  avisar: (texto: string) => void;
+  avisar: (texto: string, acao?: AcaoAviso) => void;
   idDispositivo: string;
   cssPainel: string;
   /** Numeração de ordem na exibição (preferência por navegador); nunca vai ao Texto Padrão. */

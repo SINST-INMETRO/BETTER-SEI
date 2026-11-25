@@ -35,6 +35,36 @@ await teste("dois avisos empilham e o timer remove", async () => {
   a.destruir();
 });
 
+await teste("aviso com acao mostra o botao, executa e remove", () => {
+  const { a, raiz } = montar();
+  let feito = 0;
+  a.avisar("Documento criado", {
+    rotulo: "Desfazer",
+    fazer: () => {
+      feito += 1;
+    },
+  });
+  const botao = raiz.querySelector(".botao-acao") as HTMLElement;
+  checar("botao com rotulo", botao !== null && botao.textContent === "Desfazer");
+  checar("aria-label igual ao rotulo", botao.getAttribute("aria-label") === "Desfazer");
+  checar("alvo de 44px no css", CSS.includes(".botao-acao") && CSS.includes("min-height: 44px"));
+  botao.click();
+  checar("executou a acao", feito === 1);
+  checar("removeu o aviso", raiz.querySelector(".aviso") === null);
+  a.destruir();
+});
+
+await teste("aviso com acao nao expira sozinho e o x continua fechando", async () => {
+  const { a, raiz } = montar({ duracaoMs: 10 });
+  a.avisar("Fica", { rotulo: "Entendi e organizar", fazer: () => {} });
+  await new Promise((r) => setTimeout(r, 40));
+  checar("continua na tela", raiz.querySelector(".aviso") !== null);
+  const fechar = raiz.querySelector('[aria-label="Fechar aviso"]') as HTMLElement;
+  fechar.click();
+  checar("x remove", raiz.querySelector(".aviso") === null);
+  a.destruir();
+});
+
 await teste("destruir remove o host", () => {
   const { doc, a } = montar();
   a.destruir();

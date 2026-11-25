@@ -81,7 +81,7 @@ async function iniciar(): Promise<void> {
         pedirTexto: (rotulo, inicial) => dialogos.pedirTexto(rotulo, inicial),
         confirmar: (texto) => dialogos.confirmar(texto),
         escolherPasta: (pastas, atual, numerar) => dialogos.escolherPasta(pastas, atual, numerar),
-        avisar: (texto) => avisos.avisar(texto),
+        avisar: (texto, acao) => avisos.avisar(texto, acao),
         idDispositivo: await idDispositivo(area),
         cssPainel,
         numerar,
