@@ -9,6 +9,7 @@ import "./t-ui-painel";
 import "./t-ui-coluna";
 import "./t-ui-dialogos";
 import "./t-ui-aviso";
+import "./t-painel";
 import "./t-montar";
 
 console.log("Base de Conhecimento: tudo certo.");
