@@ -19,6 +19,7 @@ import type { EntidadesArvore, IdentidadeArvore } from "../arvore/modelo";
 import { RepositorioArvore } from "../arvore/repositorio";
 import { agrupadorDoTr } from "../nucleo/itens";
 import type { ItemBase } from "../nucleo/tipos";
+import { CHAVE_NUMERAR } from "../preferencias";
 import { chaveStatus } from "../sincronia/envelope";
 import type { PayloadArrasto } from "../ui/arrasto";
 import type { AcaoAviso } from "../ui/aviso";
@@ -75,6 +76,8 @@ export interface DepsMontar {
   cssPainel: string;
   /** Numeração de ordem na exibição (preferência por navegador); nunca vai ao Texto Padrão. */
   numerar: boolean;
+  /** Área da intenção de "Nova em contexto" (sessionStorage da aba no main; padrão: `area`). */
+  intencao?: Area;
   janela: Pick<EventTarget, "addEventListener">;
   docEventos: Pick<EventTarget, "addEventListener"> & { readonly visibilityState: DocumentVisibilityState };
   agora?: () => number;
@@ -88,6 +91,7 @@ const AVISO_SO_LEITURA = "Indisponível nesta unidade: o SEI não deixa gravar o
 export async function montar(d: DepsMontar): Promise<() => void> {
   const doc = d.doc;
   const agora = d.agora ?? (() => Date.now());
+  const intencaoArea = d.intencao ?? d.area;
 
   let itens: ItemBase[];
   try {
@@ -120,7 +124,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
 
   let ent: EntidadesArvore = await repo.listar();
   let exibicao: Exibicao = montarExibicao(ent, itens);
-  let selecionada: string | null = exibicao.pastas[0]?.id ?? null;
+  let selecionada: string | null | undefined;
   const recolhidas = new Set<string>(idsDasPastas(exibicao.pastas));
   let busca = "";
   let modo: Modo = "arvore";
@@ -168,6 +172,9 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     },
     aoSoltar: (payload, destino) => void soltar(payload, destino),
     aoMoverPasta: (id) => void moverPastaPorMenu(id),
+    aoNumerar: (ligado) => {
+      void d.area.gravar({ [CHAVE_NUMERAR]: ligado ? "sim" : "nao" });
+    },
   };
 
   const painel = montarPainel(acoes, { doc, css: d.cssPainel });
@@ -193,11 +200,11 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   // intenção de uso único; o retorno do cadastro (sinal na URL) a consome.
   const btnNova = doc.querySelector("#btnNova");
   const aoClicarNova = (): void => {
-    // Na lista plana não há pasta visível selecionada: nada de contexto às cegas.
-    if (modo !== "arvore" || selecionada === null) return;
+    // Sem pasta visível selecionada (ou na lista plana): nada de contexto às cegas.
+    if (modo !== "arvore" || selecionada === null || selecionada === undefined) return;
     const caminho = caminhoDaPasta(exibicao.pastas, selecionada, d.numerar);
     if (caminho === "") return; // a pasta selecionada não está mais na árvore viva
-    void gravarIntencao(d.area, d.ident, selecionada, caminho, agora());
+    void gravarIntencao(intencaoArea, d.ident, selecionada, caminho, agora());
   };
   btnNova?.addEventListener("click", aoClicarNova);
 
@@ -259,6 +266,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
       if (pai !== null) recolhidas.delete(pai);
       selecionada = nova.id;
       await refrescar();
+      d.avisar("Pasta criada.");
     } catch (e) {
       d.avisar(e instanceof Error ? e.message : String(e));
     }
@@ -278,11 +286,12 @@ export async function montar(d: DepsMontar): Promise<() => void> {
   }
 
   async function excluir(id: string): Promise<void> {
-    if (!(await d.confirmar('Excluir a pasta? Os itens dela voltam para "Sem pasta".'))) return;
+    const nome = nomesDasPastas().get(id) ?? "esta pasta";
+    if (!(await d.confirmar(`Excluir a pasta "${nome}" e as subpastas? Os itens continuam no SEI e voltam para "Sem pasta".`))) return;
     if (!(await garantirEscrita())) return;
     try {
       await repo.excluirPasta(id);
-      if (selecionada === id) selecionada = null;
+      if (selecionada === id) selecionada = undefined;
       await refrescar();
     } catch (e) {
       d.avisar(e instanceof Error ? e.message : String(e));
@@ -409,7 +418,8 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     return mapa;
   }
 
-  function agrupadoresDaPasta(id: string | null): Set<string> {
+  function agrupadoresDaPasta(id: string | null | undefined): Set<string> | null {
+    if (id === undefined) return null; // nenhuma pasta selecionada: a tabela inteira
     if (id === null) return new Set(exibicao.semPasta.map((i) => i.agrupador));
     return new Set(ent.v.filter((v) => v.removidoEm === undefined && v.pasta === id).map((v) => v.id));
   }
@@ -478,17 +488,17 @@ export async function montar(d: DepsMontar): Promise<() => void> {
 
   async function aplicarIntencao(): Promise<void> {
     const sinal = sinalDeCriacao(d.url);
-    const intencao = await lerIntencao(d.area, d.ident, agora());
+    const intencao = await lerIntencao(intencaoArea, d.ident, agora());
     if (!sinal) {
       // Lista comum (cancelou ou voltou sem criar): a intenção não vale mais.
-      if (intencao) await limparIntencao(d.area);
+      if (intencao) await limparIntencao(intencaoArea);
       return;
     }
     if (!intencao) return;
 
     const item = itens.find((i) => i.id === sinal.id);
     if (!item) {
-      await limparIntencao(d.area);
+      await limparIntencao(intencaoArea);
       d.avisar("O documento criado não foi localizado na lista; organize-o manualmente.");
       return;
     }
@@ -497,12 +507,12 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     const vivo = ent.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
     if (vivo && vivo.pasta !== null) {
       // Já organizado (por um colega ou por outra aba): não sobrescreve.
-      await limparIntencao(d.area);
+      await limparIntencao(intencaoArea);
       return;
     }
 
     if (!nomesDasPastas().has(intencao.pastaId)) {
-      await limparIntencao(d.area);
+      await limparIntencao(intencaoArea);
       d.avisar("A pasta escolhida não existe mais; o documento ficou em Sem pasta.");
       return;
     }
@@ -513,13 +523,13 @@ export async function montar(d: DepsMontar): Promise<() => void> {
       const atual = await repo.listar();
       const existente = atual.v.find((v) => v.id === agrupador && v.removidoEm === undefined);
       if (existente && existente.pasta !== null) {
-        await limparIntencao(d.area);
+        await limparIntencao(intencaoArea);
         return;
       }
       await repo.moverVinculo(agrupador, intencao.pastaId, item.titulo);
       const criado = (await repo.listar()).v.find((v) => v.id === agrupador && v.removidoEm === undefined);
       const carimbo = criado ? { atualizadoEm: criado.atualizadoEm, dispositivo: criado.dispositivo } : null;
-      await limparIntencao(d.area);
+      await limparIntencao(intencaoArea);
       recolhidas.delete(intencao.pastaId);
       await refrescar();
       d.avisar(`Documento criado em "${intencao.caminho}".`, {
@@ -546,7 +556,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
     };
 
     if (somenteLeitura()) {
-      await limparIntencao(d.area);
+      await limparIntencao(intencaoArea);
       d.avisar("Documento criado em Sem pasta.");
       return;
     }
@@ -559,7 +569,7 @@ export async function montar(d: DepsMontar): Promise<() => void> {
           void (async () => {
             const aceitou = await perguntarEntendi(d.perguntar, d.contexto.unidade.sigla);
             if (!aceitou) {
-              await limparIntencao(d.area);
+              await limparIntencao(intencaoArea);
               return;
             }
             await porta.definir("ligado");

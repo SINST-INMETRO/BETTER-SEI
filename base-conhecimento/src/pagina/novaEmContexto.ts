@@ -60,6 +60,46 @@ export async function limparIntencao(area: Area): Promise<void> {
   await area.remover(CHAVE_INTENCAO);
 }
 
+/**
+ * Área apoiada na sessionStorage: a intenção é da ABA. Duas abas do SEI na lista
+ * não compartilham (nem limpam) a intenção uma da outra.
+ */
+export function areaDaAba(s: Pick<Storage, "getItem" | "setItem" | "removeItem" | "length" | "key">): Area {
+  const chavesDaSessao = (): string[] => {
+    const ks: string[] = [];
+    for (let i = 0; i < s.length; i++) {
+      const k = s.key(i);
+      if (k !== null) ks.push(k);
+    }
+    return ks;
+  };
+  return {
+    async obter(chaves = null) {
+      const lista = chaves === null ? chavesDaSessao() : typeof chaves === "string" ? [chaves] : chaves;
+      const saida: Record<string, unknown> = {};
+      for (const k of lista) {
+        const bruto = s.getItem(k);
+        if (bruto === null) continue;
+        try {
+          saida[k] = JSON.parse(bruto);
+        } catch {
+          // Valor corrompido na sessão: ignora (a intenção simplesmente não existe).
+        }
+      }
+      return saida;
+    },
+    async gravar(itens) {
+      for (const [k, v] of Object.entries(itens)) s.setItem(k, JSON.stringify(v));
+    },
+    async remover(chaves) {
+      for (const k of typeof chaves === "string" ? [chaves] : chaves) s.removeItem(k);
+    },
+    aoMudar() {
+      return () => undefined;
+    },
+  };
+}
+
 const ID_NUMERICO = /^\d+$/;
 
 /** `{ id }` quando a URL é o retorno de criação; null nos demais casos. */

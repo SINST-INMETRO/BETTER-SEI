@@ -149,18 +149,32 @@ export class RepositorioArvore {
     return movida;
   }
 
-  /** Exclui a pasta (lápide): subpastas sobem para o pai dela; vínculos diretos voltam a "Sem pasta". */
+  /** Exclui a pasta e as subpastas (lápides): os vínculos de toda a subárvore voltam a "Sem pasta". */
   async excluirPasta(id: string): Promise<void> {
     const p = viva(await this.pastas.obter(id));
     if (!p) return;
     const carimbo = this.d.carimbo();
-    const vivas = await this.pastas.listar();
+    const vivas = (await this.pastas.listar()).filter((x) => x.removidoEm === undefined);
+    const alvo = new Set<string>([id]);
+    let mudou = true;
+    while (mudou) {
+      mudou = false;
+      for (const x of vivas) {
+        if (x.pai !== null && alvo.has(x.pai) && !alvo.has(x.id)) {
+          alvo.add(x.id);
+          mudou = true;
+        }
+      }
+    }
     const vinculos = await this.vinculos.listar();
-    for (const f of vivas.filter((x) => x.removidoEm === undefined && x.pai === id))
-      await this.pastas.gravar(f.id, { ...f, pai: p.pai, ...carimboDe(carimbo) });
-    for (const v of vinculos.filter((x) => x.removidoEm === undefined && x.pasta === id))
-      await this.vinculos.gravar(v.id, { ...v, pasta: null, ...carimboDe(carimbo) });
-    await this.pastas.gravar(id, { ...p, removidoEm: carimbo.agora, ...carimboDe(carimbo) });
+    for (const v of vinculos) {
+      if (v.removidoEm === undefined && v.pasta !== null && alvo.has(v.pasta))
+        await this.vinculos.gravar(v.id, { ...v, pasta: null, ...carimboDe(carimbo) });
+    }
+    for (const alvoId of alvo) {
+      const pasta = vivas.find((x) => x.id === alvoId);
+      if (pasta) await this.pastas.gravar(pasta.id, { ...pasta, removidoEm: carimbo.agora, ...carimboDe(carimbo) });
+    }
   }
 
   /** Cria ou reposiciona o vínculo de um item (título é cache do título real). */
