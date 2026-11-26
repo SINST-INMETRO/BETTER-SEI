@@ -147,8 +147,8 @@ Regras que o código garante:
 
 - **Referência estável**: usar o `agrupador` como id do vínculo, nunca o id da
   versão (`id_base_conhecimento` muda a cada nova versão).
-- **Nada some**: excluir pasta nunca exclui item; os vínculos voltam a
-  `pasta: null` ("Sem pasta") e as subpastas sobem um nível.
+- **Nada some**: excluir pasta (e as subpastas, na mesma operação) nunca exclui
+  item do SEI; os vínculos de toda a subárvore voltam a `pasta: null` ("Sem pasta").
 - **Título é cache**: ao ler a lista, o `titulo` do vínculo é atualizado com o
   título real; vínculo para pasta removida volta a `pasta: null`.
 - **Integridade do `pai` na exibição**: a mesclagem por entidade pode deixar um
@@ -161,7 +161,8 @@ Regras que o código garante:
 
 ## UX das Fases A/B (24/11/2026)
 
-- **Árvore de documentação**: cada pasta com conteúdo tem chevron (`▸`/`▾`) com `aria-expanded`; as pastas começam **recolhidas**. Os documentos aparecem dentro da pasta expandida e o nome é link para a tela nativa (`visualizar`, nova aba).
+- **Árvore de documentação**: cada pasta com conteúdo tem chevron (`▸`/`▾`) com `aria-expanded`; as pastas começam **recolhidas**. Os documentos aparecem dentro da pasta expandida e o nome é link para a tela nativa (`visualizar`, nova aba). Ao abrir (e ao ordenar a tabela) **nenhuma pasta fica selecionada**: a tabela mostra todos os itens. A contagem de documentos aparece entre parênteses ("Fiscalização (3)"), para não se confundir com numeração.
+- **Busca**: o campo "Buscar…" do painel filtra pastas e documentos pela árvore, inclusive pastas que contêm um documento com o termo; a busca nativa do SEI segue filtrando só a tabela.
 - **Nova pasta** cria **filha da pasta selecionada**; o pai é expandido e a nova pasta é selecionada (comportamento de IDE).
 - **Arrastar-e-soltar** de documentos e pastas: alvos são as linhas de pasta e "Sem pasta" (documento → sem pasta; pasta → raiz). Toda soltura pede confirmação e a de pasta diz "Você está movendo a PASTA … (com subpastas e itens)". Pasta em descendente própria é recusada com aviso. O menu "Mover para…" continua como alternativa por teclado.
 - **Diálogos no padrão do SEI** (Shadow DOM): nomear/renomear, confirmar e escolher pasta; `role="dialog"`, `aria-modal`, foco preso, Escape cancela.
@@ -224,7 +225,7 @@ O sinal ao vivo é a URL `base_conhecimento_listar&acao_origem=base_conhecimento
 2. **Mostrar o destino antes.** Na tela de cadastro, faixa no visual do SEI: “Será organizado em: `{caminho}`” com **Não organizar** (limpa a intenção; nada é gravado).
 3. **Nunca silencioso.** Ao voltar, um aviso diz onde o documento ficou — ou o que impediu a organização.
 4. **Desfazer.** O aviso de sucesso tem **Desfazer**, que devolve o item a "Sem pasta".
-5. **Intenção de uso único e com prazo.** Vale uma vez, expira em 10 min (`spro_bc_nova_pasta`, `chrome.storage.local`) e é limpa ao aplicar, cancelar, voltar sem o sinal, host/unidade diferente ou pasta removida.
+5. **Intenção de uso único, com prazo e por aba.** Vale uma vez, expira em 10 min (`spro_bc_nova_pasta` na `sessionStorage` da aba — duas abas do SEI não compartilham nem limpam a intenção uma da outra) e é limpa ao aplicar, cancelar, voltar sem o sinal, host/unidade diferente ou pasta removida.
 6. **Nunca sobrescrever organização existente.** Item com vínculo vivo em outra pasta: intenção descartada, sem aviso e sem gravação.
 7. **Consentimento e permissão (decisão A).** Sem o "Entendi" ou em modo leitura, não organiza: fica em "Sem pasta" e o aviso oferece **Entendi e organizar** (pergunta o "Entendi" e associa); recusar limpa a intenção. Leitura estrita não oferece a ação.
 8. **Concorrência segura.** A associação usa `repo.moverVinculo` (upsert com carimbo); a mesclagem do motor segue intacta.
@@ -237,4 +238,4 @@ O sinal ao vivo é a URL `base_conhecimento_listar&acao_origem=base_conhecimento
 - **Preferência:** `spro_bc_numerar` em `chrome.storage.local` (`"sim"`/`"nao"`), **padrão desligada**, por navegador — só apresentação, nunca entra no Texto Padrão.
 - **Onde aparece (ligada):** árvore, coluna "Pasta", diálogo "Mover para…", avisos e faixa do cadastro. "Sem pasta" nunca é numerado.
 - **Ao vivo:** trocar a preferência remonta o módulo (a árvore volta ao estado padrão de recolhidas/seleção).
-- **Onde configurar:** aba **Conhecimento** do painel lateral (`html/base-conhecimento.html`), que só aparece quando `js/init_base_conhecimento.js` está no manifest (padrão `temX` do shell).
+- **Onde configurar:** interruptor **Numerar pastas** no próprio painel Pastas e, também, na aba **Conhecimento** do painel lateral (`html/base-conhecimento.html`), que só aparece quando `js/init_base_conhecimento.js` está no manifest (padrão `temX` do shell).

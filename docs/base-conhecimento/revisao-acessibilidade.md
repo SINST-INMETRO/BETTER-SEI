@@ -83,3 +83,12 @@ Acréscimos ao escopo da auditoria (fixados em CSS/testes; medição ao vivo pen
 - **Aba "Conhecimento"**: interruptor é `<label>` + `<input type="checkbox">` nativo (nome acessível "Numerar pastas"), alvo de 44 px na linha e foco visível; a explicação e a nota usam texto real (sem `innerHTML`).
 - **Numeração**: é só texto exibido após o nome (`textContent`); não altera `aria-label` de chevrons, não muda o nome anunciado e não entra no Texto Padrão.
 - Medir ao vivo: contraste da faixa e dos botões, foco por teclado na faixa do cadastro e no interruptor da aba, e o anúncio do aviso com ação.
+
+## Rodada de teste ao vivo (26/11/2026)
+
+- **Sem seleção automática**: ao abrir a lista, nenhum botão de pasta tem `aria-current`; a tabela mostra todos os itens (o leitor de tela não anuncia uma pasta "atual" que ninguém escolheu).
+- **Contagem**: o valor entre parênteses tem `title` "N documento(s)" (dica por hover) e deixa claro que não é numeração de ordem.
+- **Busca**: `<input type="search">` com `aria-label="Buscar na árvore"`.
+- **Numerar pastas no painel**: `<label>` + `<input type="checkbox">` nativo (nome acessível "Numerar pastas"), linha com `min-height: 44px` e `:focus-visible`.
+- **Excluir pasta**: a confirmação descreve o alcance ("a pasta … e as subpastas") e que os itens continuam no SEI — a ação destrutiva só acontece em pastas do módulo, nunca em itens nativos.
+- Medir ao vivo: foco do interruptor no painel, ordem de tabulação do painel e contraste da contagem (`#495057` sobre `#ffffff`, 8,18:1).
