@@ -7,7 +7,7 @@
  * escrita é o Texto Padrão da árvore, pela sincronia.
  */
 
-import { areaChrome } from "@comum/armazenamento/area";
+import { type Area, areaChrome, areaMemoria } from "@comum/armazenamento/area";
 import { idDispositivo } from "@comum/armazenamento/dispositivo";
 import { lerOpcaoLegada, opcaoLegadaLigada } from "@comum/opcoes/legadas";
 import { travarComLocks, travarEsperando } from "@comum/sincronia/trava";
@@ -18,7 +18,7 @@ import { paginaDe } from "@nucleo/sessao/pagina";
 import { lerItensDaUnidade } from "./nucleo/itens";
 import { armazemDoTexto } from "./pagina/armazem";
 import { montar, quandoDomPronto, telaAtual } from "./pagina/montar";
-import { lerIntencao, limparIntencao, montarFaixaDestino } from "./pagina/novaEmContexto";
+import { areaDaAba, lerIntencao, limparIntencao, montarFaixaDestino } from "./pagina/novaEmContexto";
 import { CHAVE_NUMERAR, lerNumeracao } from "./preferencias";
 import { criarAvisos } from "./ui/aviso";
 import cssAvisos from "./ui/aviso.css";
@@ -86,6 +86,7 @@ async function iniciar(): Promise<void> {
         idDispositivo: await idDispositivo(area),
         cssPainel,
         numerar,
+        intencao: areaDaIntencao(),
         janela: window,
         docEventos: document,
         travar: travarComLocks,
@@ -109,7 +110,7 @@ async function iniciar(): Promise<void> {
 /** Na tela de cadastro, mostra o destino da intenção antes de criar (só UI). */
 async function mostrarFaixa(): Promise<void> {
   const ctx = lerContexto(pagina());
-  const area = areaChrome(chrome.storage.local, "local");
+  const area = areaDaIntencao();
   const intencao = await lerIntencao(area, { host: ctx.host, unidade: ctx.unidade.id });
   if (!intencao) return;
   const form =
@@ -120,6 +121,15 @@ async function mostrarFaixa(): Promise<void> {
     void limparIntencao(area);
   });
   form.insertBefore(faixa.raiz, form.firstChild);
+}
+
+/** A intenção é da aba: sessionStorage (duas abas do SEI não compartilham a intenção). */
+function areaDaIntencao(): Area {
+  try {
+    return areaDaAba(window.sessionStorage);
+  } catch {
+    return areaMemoria();
+  }
 }
 
 async function partir(): Promise<void> {

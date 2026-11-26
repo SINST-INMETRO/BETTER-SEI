@@ -55,17 +55,24 @@ await teste("moverPasta recusa ciclo e aceita mover para a raiz", async () => {
   checar("subiu para a raiz", movida.pai === null);
 });
 
-await teste("excluirPasta sobe subpastas e devolve vinculos para Sem pasta", async () => {
+await teste("excluirPasta exclui a subarvore e devolve os vinculos para Sem pasta", async () => {
   const repo = repositorio(areaMemoria());
   const a = await repo.criarPasta("A", null);
   const b = await repo.criarPasta("B", a.id);
   const c = await repo.criarPasta("C", b.id);
+  const d = await repo.criarPasta("D", a.id);
   await repo.moverVinculo("40", b.id, "PROCEDIMENTO A");
+  await repo.moverVinculo("41", c.id, "PROCEDIMENTO C");
+  await repo.moverVinculo("42", d.id, "PROCEDIMENTO D");
   await repo.excluirPasta(b.id);
   const lista = await repo.listar();
   checar("pasta tem lapide", typeof lista.p.find((p) => p.id === b.id)?.removidoEm === "number");
-  checar("subpasta subiu para o avo", lista.p.find((p) => p.id === c.id)?.pai === a.id);
-  checar("vinculo voltou para Sem pasta", lista.v.find((v) => v.id === "40")?.pasta === null);
+  checar("subpasta tambem tem lapide", typeof lista.p.find((p) => p.id === c.id)?.removidoEm === "number");
+  checar("avo intacto", lista.p.find((p) => p.id === a.id)?.removidoEm === undefined);
+  checar("irma intacta", lista.p.find((p) => p.id === d.id)?.removidoEm === undefined);
+  checar("vinculo da pasta excluida sem pasta", lista.v.find((v) => v.id === "40")?.pasta === null);
+  checar("vinculo da subpasta sem pasta", lista.v.find((v) => v.id === "41")?.pasta === null);
+  checar("vinculo da irma intacto", lista.v.find((v) => v.id === "42")?.pasta === d.id);
 });
 
 await teste("moverVinculo cria quando ausente e atualiza pasta e titulo quando existe", async () => {

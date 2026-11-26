@@ -1,5 +1,6 @@
 import { areaMemoria } from "@comum/armazenamento/area";
 import {
+  areaDaAba,
   CHAVE_INTENCAO,
   gravarIntencao,
   lerIntencao,
@@ -77,4 +78,37 @@ await teste("montarFaixaDestino mostra o destino e cancela", () => {
   botao.click();
   checar("faixa removida", !form.contains(faixa.raiz));
   checar("cancelou", cancelou === 1);
+});
+
+function sessaoFake(): Pick<Storage, "getItem" | "setItem" | "removeItem" | "length" | "key"> {
+  const mapa = new Map<string, string>();
+  return {
+    getItem: (k) => mapa.get(String(k)) ?? null,
+    setItem: (k, v) => {
+      mapa.set(String(k), String(v));
+    },
+    removeItem: (k) => {
+      mapa.delete(String(k));
+    },
+    get length() {
+      return mapa.size;
+    },
+    key: (i) => [...mapa.keys()][i] ?? null,
+  };
+}
+
+await teste("areaDaAba guarda e le JSON na sessao da aba", async () => {
+  const area = areaDaAba(sessaoFake());
+  await gravarIntencao(area, IDENT, "p1", "1. Fiscalização", AGORA);
+  const lida = await lerIntencao(area, IDENT, AGORA + 1);
+  checar("pasta", lida?.pastaId === "p1");
+  checar("caminho", lida?.caminho === "1. Fiscalização");
+  await limparIntencao(area);
+  checar("removida", (await lerIntencao(area, IDENT, AGORA)) === null);
+});
+
+await teste("areaDaAba ignora JSON corrompido", async () => {
+  const s = sessaoFake();
+  s.setItem(CHAVE_INTENCAO, "nao-json");
+  checar("sem intencao", (await lerIntencao(areaDaAba(s), IDENT, AGORA)) === null);
 });

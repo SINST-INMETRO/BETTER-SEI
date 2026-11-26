@@ -97,8 +97,9 @@ await teste("montar devolve a tela nativa quando a leitura falha", async () => {
   desfazer();
 });
 
-await teste("nova pasta pede o Entendi e aparece na arvore", async () => {
-  const d = deps();
+await teste("nova pasta pede o Entendi, aparece na arvore e avisa", async () => {
+  const avisos: string[] = [];
+  const d = deps({ avisar: (t) => avisos.push(t) });
   const desfazer = await montar(d);
   const s = sombra(d.doc);
   disparar(s.querySelector('[aria-label="Nova pasta"]') as Element, "click");
@@ -108,6 +109,7 @@ await teste("nova pasta pede o Entendi e aparece na arvore", async () => {
     [...s.querySelectorAll(".pasta")].some((b) => b.textContent?.startsWith("Fiscalizacao")),
   );
   checar("consentimento ligado", (await consentimentoBase(d.sync, IDENT.host, "usuario.teste", IDENT.unidade).estado()) === "ligado");
+  checar("aviso de sucesso", avisos.includes("Pasta criada."));
   desfazer();
 });
 
@@ -615,6 +617,12 @@ await teste("Nova com pasta selecionada grava a intencao e a volta usa o caminho
   const desfazer = await montar(d);
   disparar(d.doc.querySelector("#btnNova") as Element, "click");
   await esperar();
+  checar("sem selecao nao captura", !(CHAVE_INTENCAO in (await d.area.obter(CHAVE_INTENCAO))));
+  const pasta = [...sombra(d.doc).querySelectorAll(".pasta")].find((b) => b.textContent?.startsWith("1. Fiscalizacao")) as HTMLElement;
+  disparar(pasta, "click");
+  await esperar();
+  disparar(d.doc.querySelector("#btnNova") as Element, "click");
+  await esperar();
   const bruto = (await d.area.obter(CHAVE_INTENCAO))[CHAVE_INTENCAO] as { pastaId?: string; caminho?: string } | undefined;
   checar("pasta da intencao", bruto?.pastaId === "p1");
   checar("caminho numerado no clique", bruto?.caminho === "1. Fiscalizacao");
@@ -715,4 +723,84 @@ await teste("falha de storage na intencao nao derruba o montar", async () => {
   checar("painel montado", d.doc.querySelector(".spro-bc-host") !== null);
   desfazer();
   checar("limpeza removeu o painel", d.doc.querySelector(".spro-bc-host") === null);
+});
+
+await teste("montar le a intencao na area da aba, nao na area geral", async () => {
+  const { avisos, avisar } = capturarAvisos();
+  const intencaoAba = areaMemoria();
+  const d = deps({ url: URL_RETORNO, intencao: intencaoAba, avisar });
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  await consentimentoBase(d.sync, IDENT.host, "usuario.teste", IDENT.unidade).definir("ligado");
+  await gravarIntencao(intencaoAba, IDENT, "p1", "1. Fiscalizacao", 100);
+  const desfazer = await montar(d);
+  checar("vinculo na pasta", (await vinculoDaArea(d, AGRUPADOR_42))?.pasta === "p1");
+  checar(
+    "aviso com desfazer",
+    avisos.some((a) => a.acao?.rotulo === "Desfazer"),
+  );
+  checar("intencao limpa na area da aba", !(CHAVE_INTENCAO in (await intencaoAba.obter(CHAVE_INTENCAO))));
+  desfazer();
+});
+
+await teste("montar nao seleciona pasta sozinho e a tabela mostra tudo", async () => {
+  const d = deps();
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": PASTA_P1,
+    "base-conhecimento/pastas/p2": { ...PASTA_P1, id: "p2", nome: "Talentos", ordem: "a1" },
+  });
+  const desfazer = await montar(d);
+  checar("nada selecionado", sombra(d.doc).querySelector('[aria-current="true"]') === null);
+  const visiveis = [...d.doc.querySelectorAll("tr[data-spro-agrupador]")].filter((tr) => (tr as HTMLElement).style.display !== "none");
+  checar("todas as linhas visiveis", visiveis.length === 3);
+  desfazer();
+});
+
+await teste("ordenar a tabela nao seleciona pasta", async () => {
+  const d = deps();
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  const desfazer = await montar(d);
+  disparar(d.doc.querySelector("table.infraTable") as Element, "sortEnd");
+  await esperar();
+  checar("continua sem selecao", sombra(d.doc).querySelector('[aria-current="true"]') === null);
+  desfazer();
+});
+
+await teste("excluir pasta avisa que subpastas vao junto e os itens ficam no SEI", async () => {
+  const textos: string[] = [];
+  const d = deps({
+    confirmar: async (t) => {
+      textos.push(t);
+      return false;
+    },
+  });
+  await d.area.gravar({
+    "base-conhecimento/pastas/p1": PASTA_P1,
+    "base-conhecimento/pastas/p2": { ...PASTA_P1, id: "p2", nome: "Sub", pai: "p1", ordem: "a0" },
+  });
+  const desfazer = await montar(d);
+  const s = sombra(d.doc);
+  const raiz = [...s.querySelectorAll(".pasta")].find((b) => b.textContent?.startsWith("Fiscalizacao")) as HTMLElement;
+  const li = raiz.closest("li") as HTMLElement;
+  (li.querySelector('[aria-label="Ações da pasta"]') as HTMLElement).click();
+  const excluir = [...li.querySelectorAll(".acoes button")].find((b) => b.textContent === "Excluir") as HTMLElement;
+  excluir.click();
+  await esperar();
+  checar(
+    "confirmacao cita subpastas e o SEI",
+    textos.some((t) => t.includes("e as subpastas") && t.includes("continuam no SEI") && t.includes("Sem pasta")),
+  );
+  desfazer();
+});
+
+await teste("interruptor do painel grava a preferencia de numerar", async () => {
+  const d = deps();
+  await d.area.gravar({ "base-conhecimento/pastas/p1": PASTA_P1 });
+  const desfazer = await montar(d);
+  const caixa = sombra(d.doc).querySelector(".numerar input") as HTMLInputElement;
+  checar("desmarcado no padrao", !caixa.checked);
+  caixa.checked = true;
+  disparar(caixa, "change");
+  await esperar();
+  checar("gravou sim", (await d.area.obter("spro_bc_numerar")).spro_bc_numerar === "sim");
+  desfazer();
 });

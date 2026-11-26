@@ -18,7 +18,8 @@ export interface EstadoPainel {
   pastas: PastaExibida[];
   semPasta: ItemBase[];
   orfaos: Vinculo[];
-  selecionada: string | null;
+  /** Pasta selecionada; null = "Sem pasta", undefined/ausente = nenhuma (tabela inteira). */
+  selecionada: string | null | undefined;
   busca: string;
   /** Faixa de aviso (ex.: "Indisponível nesta unidade"). */
   aviso?: string;
@@ -40,6 +41,8 @@ export interface AcoesPainel {
   aoMoverItem(agrupador: string): void;
   aoRemoverItem(agrupador: string): void;
   aoBuscar(texto: string): void;
+  /** Ligou/desligou a numeração de ordem (preferência por navegador). */
+  aoNumerar(ligado: boolean): void;
   /** Soltou um documento ou uma pasta sobre um destino (pasta id, ou null = Sem pasta/raiz). */
   aoSoltar(payload: PayloadArrasto, destino: string | null): void;
 }
@@ -78,7 +81,7 @@ export function montarPainel(
   nova.className = "nova";
   nova.setAttribute("aria-label", "Nova pasta");
   nova.textContent = "＋ Nova pasta";
-  nova.addEventListener("click", () => acoes.aoNovaPasta(atual.selecionada));
+  nova.addEventListener("click", () => acoes.aoNovaPasta(atual.selecionada ?? null));
   const busca = doc.createElement("input");
   busca.type = "search";
   busca.className = "busca";
@@ -86,6 +89,16 @@ export function montarPainel(
   busca.setAttribute("aria-label", "Buscar na árvore");
   busca.addEventListener("input", () => acoes.aoBuscar(busca.value));
   topo.append(titulo, nova, busca);
+
+  const numerar = doc.createElement("label");
+  numerar.className = "numerar";
+  const caixaNum = doc.createElement("input");
+  caixaNum.type = "checkbox";
+  caixaNum.checked = false;
+  caixaNum.addEventListener("change", () => acoes.aoNumerar(caixaNum.checked));
+  const rotuloNum = doc.createElement("span");
+  rotuloNum.textContent = "Numerar pastas";
+  numerar.append(caixaNum, rotuloNum);
 
   const arvore = doc.createElement("div");
   arvore.className = "arvore";
@@ -99,7 +112,7 @@ export function montarPainel(
   nota.className = "nota";
   nota.textContent = "Clique na seta para recolher/expandir. No menu ⋯ da pasta: renomear, nova subpasta, excluir.";
 
-  painel.append(topo, avisoEl, arvore, nota);
+  painel.append(topo, numerar, avisoEl, arvore, nota);
   raiz.appendChild(painel);
 
   let atual: EstadoPainel = {
@@ -151,7 +164,8 @@ export function montarPainel(
     const b = atual.busca.trim().toLowerCase();
     return b === "" || texto.toLowerCase().includes(b);
   };
-  const pastaCombina = (p: PastaExibida): boolean => combina(p.nome) || p.filhas.some(pastaCombina);
+  const pastaCombina = (p: PastaExibida): boolean =>
+    combina(p.nome) || (atual.itensPorPasta[p.id] ?? []).some((i) => combina(i.titulo)) || p.filhas.some(pastaCombina);
 
   function linhaItem(
     agrupador: string,
@@ -220,7 +234,8 @@ export function montarPainel(
     const nome = el("span");
     nome.textContent = atual.numerar ? nomeNumerado(p.nome, numeroDaPasta(atual.pastas, p.id)) : p.nome;
     const cont = el("span", "contagem");
-    cont.textContent = String(p.contagem);
+    cont.textContent = `(${p.contagem})`;
+    cont.title = `${p.contagem} ${p.contagem === 1 ? "documento" : "documentos"}`;
     botao.append(ic, nome, cont);
     botao.addEventListener("click", () => acoes.aoSelecionar(p.id));
     tornarArrastavel(botao, { tipo: "pasta", id: p.id });
@@ -270,6 +285,7 @@ export function montarPainel(
 
   function render(estado: EstadoPainel): void {
     atual = estado;
+    caixaNum.checked = estado.numerar;
     arvore.replaceChildren();
     avisoEl.hidden = !estado.aviso;
     avisoEl.textContent = estado.aviso ?? "";
@@ -290,7 +306,8 @@ export function montarPainel(
     const nomeSem = el("span");
     nomeSem.textContent = "Sem pasta";
     const contSem = el("span", "contagem");
-    contSem.textContent = String(estado.semPasta.length);
+    contSem.textContent = `(${estado.semPasta.length})`;
+    contSem.title = `${estado.semPasta.length} ${estado.semPasta.length === 1 ? "documento" : "documentos"}`;
     botaoSem.append(icSem, nomeSem, contSem);
     botaoSem.addEventListener("click", () => acoes.aoSelecionar(null));
     tornarAlvo(linhaSem, null);

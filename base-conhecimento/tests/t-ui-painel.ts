@@ -60,6 +60,7 @@ function painel() {
       aoRemoverItem: registrar("aoRemoverItem"),
       aoBuscar: registrar("aoBuscar"),
       aoSoltar: registrar("aoSoltar"),
+      aoNumerar: registrar("aoNumerar"),
     },
     { doc, css: CSS },
   );
@@ -91,7 +92,7 @@ await teste("painel renderiza pastas aninhadas, contagens e Sem pasta", () => {
   checar("subpasta aninhada", raiz.querySelector(".filhas .pasta")?.textContent?.includes("Notas") === true);
   checar(
     "contagem",
-    [...raiz.querySelectorAll(".contagem")].some((c) => c.textContent === "1"),
+    [...raiz.querySelectorAll(".contagem")].some((c) => c.textContent === "(1)"),
   );
   checar("Sem pasta com item", raiz.querySelector(".item .rotulo")?.textContent === "PROCEDIMENTO A");
 });
@@ -317,4 +318,37 @@ await teste("menu da pasta tem Mover para e chama aoMoverPasta", () => {
     chamadas.some((c) => c.acao === "aoMoverPasta" && c.args[0] === "p1"),
   );
   checar("data-pasta-id no chevron", raiz.querySelector('[data-pasta-id="p1"].chevron') !== null);
+});
+
+await teste("busca por documento mantem a pasta que o contem", () => {
+  const { p, raiz } = painel();
+  p.render({
+    ...estado,
+    busca: "PROCEDIMENTO B",
+    recolhidas: new Set<string>(),
+    itensPorPasta: { p2: [item("41", "PROCEDIMENTO B")] },
+  });
+  const pastas = [...raiz.querySelectorAll(".pasta")].map((b) => b.textContent ?? "");
+  checar(
+    "pasta com documento aparece",
+    pastas.some((t) => t.startsWith("Fiscalizacao")),
+  );
+  checar(
+    "filha com o documento aparece",
+    pastas.some((t) => t.startsWith("Notas")),
+  );
+  checar("pasta sem correspondencia some", !pastas.some((t) => t.startsWith("Talentos")));
+});
+
+await teste("painel tem o interruptor de numerar refletindo o estado", () => {
+  const { p, chamadas, raiz } = painel();
+  p.render({ ...estado, numerar: true });
+  const caixa = raiz.querySelector(".numerar input") as HTMLInputElement;
+  checar("marcado quando ligado", caixa?.checked === true);
+  caixa.checked = false;
+  disparar(caixa, "change");
+  checar(
+    "callback recebe o novo valor",
+    chamadas.some((c) => c.acao === "aoNumerar" && c.args[0] === false),
+  );
 });
